@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ケガ一覧 — Toshiba Master Data</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { color-scheme: dark;
+  --page:#08080a; --surface:#14141a; --ink-1:#f3f4f6; --ink-2:#c9cdd6; --ink-muted:#a0aec0;
+  --grid:rgba(255,255,255,.08); --border:rgba(197,160,89,.28);
+  --gold:#c5a059; --red:#ff0b24; --radius:8px; --gap:14px; }
+body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:var(--page); color:var(--ink-1); line-height:1.5; }
+.topnav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  background:var(--surface);border-bottom:1px solid var(--border);padding:10px 18px;}
+.topnav .brand{font-weight:800;font-size:15px;color:var(--gold);text-decoration:none;white-space:nowrap;letter-spacing:.02em;}
+.topnav .navlinks{display:flex;gap:4px;flex-wrap:wrap;}
+.topnav .navlinks a{font-size:13px;color:var(--ink-2);text-decoration:none;padding:6px 12px;border-radius:6px;white-space:nowrap;font-weight:600;}
+.topnav .navlinks a:hover{background:rgba(255,255,255,.06);}
+.topnav .navlinks a.active{background:var(--red);color:#fff;}
+.topnav .sub{font-size:12px;color:var(--ink-muted);}
+.topnav .spacer{flex:1;}
+#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+  border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
+#logout-btn:hover{background:rgba(255,255,255,.06);}
+.wrap { max-width:1200px; margin:0 auto; padding:18px var(--gap) 40px; }
+header h1 { font-size:20px; font-weight:800; }
+header .sub { font-size:12.5px; color:var(--ink-2); margin-top:2px; }
+.filters { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:16px 0; }
+.fg { display:flex; align-items:center; gap:6px; }
+.fg label { font-size:11px; color:var(--gold); font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.fg select { padding:6px 10px; font-size:14px; color:var(--ink-1); max-width:260px;
+  background:var(--page); border:1px solid #3a3a42; border-radius:6px; }
+.empty { padding:40px 0; text-align:center; color:var(--ink-muted); font-size:13px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead th { text-align:left; padding:8px 9px; border-bottom:2px solid var(--border); color:var(--gold);
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; position:sticky; top:49px; background:var(--surface); }
+tbody td { padding:7px 9px; border-bottom:1px solid var(--grid); vertical-align:top; }
+tbody tr:hover { background: rgba(255,255,255,.04); }
+tbody tr.detail-row { display:none; }
+tbody tr.detail-row.open { display:table-row; }
+.detail-row td { background:rgba(255,255,255,.02); padding:10px 14px; }
+.detail-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:6px 16px; }
+.detail-grid .k { color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
+.detail-grid .v { font-size:13px; }
+.toggle-btn { background:none; border:1px solid var(--border); color:var(--ink-2); border-radius:5px;
+  font-size:11px; padding:3px 8px; cursor:pointer; }
+.toggle-btn:hover { background:rgba(255,255,255,.06); }
+.tbl-scroll { max-height:70vh; overflow:auto; border:1px solid var(--border); border-radius:var(--radius); }
+.pill { display:inline-block; padding:1px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+.pill.cont { background:rgba(255,11,36,.18); color:#ff6b7a; }
+.pill.noncont { background:rgba(197,160,89,.18); color:var(--gold); }
+footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="index.html">🏉 Toshiba Master Data</a>
+  <div class="navlinks">
+    <a href="index.html">ホーム</a>
+    <a href="rugby.html">ラグビー</a>
+    <a href="gym.html">ジム</a>
+    <a href="conditioning.html" class="active">コンディショニング</a>
+  </div>
+  <span class="spacer"></span>
+  <button id="logout-btn" type="button">ログアウト</button>
+</nav>
+<div class="wrap">
+  <header>
+    <h1>ケガ一覧</h1>
+    <div class="sub">Record of past injuries.xlsx「全体」シートを読み込み。行をクリックすると詳細を展開します。</div>
+  </header>
+  <div class="filters">
+    <div class="fg"><label for="f-season">シーズン</label><select id="f-season"></select></div>
+    <div class="fg"><label for="f-player">選手</label><select id="f-player"></select></div>
+  </div>
+  <div id="content"><div class="empty">読み込み中...</div></div>
+  <footer>選手数・ケガ件数は Supabase の squad_players / injuries テーブルから取得。</footer>
+</div>
+<script>
+const SUPABASE_URL = 'https://lwsrrourcwidrujvaqvr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_WUHxP4DDM9FRN4JfduqDNA_-S3lCM2p';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function fetchAll(table, columns){
+  let out = [], from = 0; const pageSize = 1000;
+  while (true){
+    const { data, error } = await sb.from(table).select(columns).range(from, from + pageSize - 1);
+    if (error) throw error;
+    out = out.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return out;
+}
+
+let INJURIES = [];
+
+function fillFilters(){
+  const seasons = [...new Set(INJURIES.map(r => r.season))].sort().reverse();
+  const sSel = document.getElementById('f-season');
+  sSel.replaceChildren(new Option('すべて', 'all'));
+  seasons.forEach(s => sSel.appendChild(new Option(s, s)));
+
+  const players = [...new Set(INJURIES.map(r => r.squad_players.name))].sort();
+  const pSel = document.getElementById('f-player');
+  pSel.replaceChildren(new Option('すべて', 'all'));
+  players.forEach(p => pSel.appendChild(new Option(p, p)));
+}
+
+function filtered(){
+  const season = document.getElementById('f-season').value;
+  const player = document.getElementById('f-player').value;
+  return INJURIES.filter(r =>
+    (season === 'all' || r.season === season) &&
+    (player === 'all' || r.squad_players.name === player)
+  ).sort((a, b) => (b.injury_date || '').localeCompare(a.injury_date || ''));
+}
+
+function situationPill(raw){
+  const s = raw['Situation'];
+  if (!s) return '';
+  const cls = s.startsWith('Non') ? 'noncont' : 'cont';
+  return `<span class="pill ${cls}">${s}</span>`;
+}
+
+function render(){
+  const rows = filtered();
+  const content = document.getElementById('content');
+  if (!rows.length){
+    content.innerHTML = '<div class="empty">該当するケガ記録がありません</div>';
+    return;
+  }
+  const scroll = document.createElement('div'); scroll.className = 'tbl-scroll';
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>日付</th><th>シーズン</th><th>選手</th><th>部位</th><th>診断</th><th>状況</th><th>復帰まで(日)</th><th></th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  rows.forEach((r, i) => {
+    const raw = r.raw;
+    const tr = document.createElement('tr');
+    tr.className = 'main-row';
+    tr.style.cursor = 'pointer';
+    tr.innerHTML = `<td>${r.injury_date || '–'}</td><td>${r.season}</td><td>${r.squad_players.name}</td>` +
+      `<td>${raw['Part'] || '–'}</td><td>${raw['Injury'] || '–'}</td><td>${situationPill(raw)}</td>` +
+      `<td>${raw['To RTP'] != null ? raw['To RTP'] : '–'}</td><td><button class="toggle-btn" type="button">詳細</button></td>`;
+    const detailTr = document.createElement('tr');
+    detailTr.className = 'detail-row';
+    const detailTd = document.createElement('td'); detailTd.colSpan = 8;
+    const grid = document.createElement('div'); grid.className = 'detail-grid';
+    Object.entries(raw).forEach(([k, v]) => {
+      if (v == null || v === '') return;
+      const kEl = document.createElement('div'); kEl.className = 'k'; kEl.textContent = k;
+      const vEl = document.createElement('div'); vEl.className = 'v'; vEl.textContent = v;
+      grid.appendChild(kEl); grid.appendChild(vEl);
+    });
+    detailTd.appendChild(grid); detailTr.appendChild(detailTd);
+    const toggle = () => detailTr.classList.toggle('open');
+    tr.addEventListener('click', toggle);
+    tbody.appendChild(tr); tbody.appendChild(detailTr);
+  });
+  table.appendChild(tbody); scroll.appendChild(table);
+  content.replaceChildren(scroll);
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+  location.href = 'login.html';
+}
+document.getElementById('logout-btn').addEventListener('click', doLogout);
+document.getElementById('f-season').addEventListener('change', render);
+document.getElementById('f-player').addEventListener('change', render);
+
+async function init(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session){
+    location.href = 'login.html?next=conditioning.html';
+    return;
+  }
+  try {
+    // squad_players/injuries are RLS-restricted to emails listed in
+    // coaching_staff_emails. That table itself has no read policy (only
+    // service_role can see it), so there's no direct "am I on the list"
+    // query to run -- an authenticated-but-not-allowlisted user simply gets
+    // an empty result set back here, which we treat as "no access".
+    INJURIES = await fetchAll('injuries', 'id, season, injury_date, raw, squad_players(name)');
+  } catch (e) {
+    document.getElementById('content').innerHTML = '<div class="empty">データの読み込みに失敗しました</div>';
+    console.error(e);
+    return;
+  }
+  if (!INJURIES.length){
+    document.getElementById('content').innerHTML =
+      '<div class="empty">表示できるデータがありません。アクセス権限が無いか、まだデータが投入されていない可能性があります。</div>';
+    return;
+  }
+  fillFilters();
+  render();
+}
+init();
+</script>
+</body>
+</html>

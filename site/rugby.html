@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ラグビー個人スタッツ — Toshiba Master Data</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { color-scheme: dark;
+  --page:#08080a; --surface:#14141a; --ink-1:#f3f4f6; --ink-2:#c9cdd6; --ink-muted:#a0aec0;
+  --grid:rgba(255,255,255,.08); --border:rgba(197,160,89,.28);
+  --gold:#c5a059; --red:#ff0b24; --radius:8px; --gap:14px; }
+body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:var(--page); color:var(--ink-1); line-height:1.5; }
+.topnav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  background:var(--surface);border-bottom:1px solid var(--border);padding:10px 18px;}
+.topnav .brand{font-weight:800;font-size:15px;color:var(--gold);text-decoration:none;white-space:nowrap;letter-spacing:.02em;}
+.topnav .navlinks{display:flex;gap:4px;flex-wrap:wrap;}
+.topnav .navlinks a{font-size:13px;color:var(--ink-2);text-decoration:none;padding:6px 12px;border-radius:6px;white-space:nowrap;font-weight:600;}
+.topnav .navlinks a:hover{background:rgba(255,255,255,.06);}
+.topnav .navlinks a.active{background:var(--red);color:#fff;}
+.topnav .spacer{flex:1;}
+#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+  border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
+#logout-btn:hover{background:rgba(255,255,255,.06);}
+.wrap { max-width:900px; margin:0 auto; padding:18px var(--gap) 40px; }
+header h1 { font-size:20px; font-weight:800; }
+header .sub { font-size:12.5px; color:var(--ink-2); margin-top:2px; }
+.filters { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:16px 0; }
+.fg { display:flex; align-items:center; gap:6px; }
+.fg label { font-size:11px; color:var(--gold); font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.fg select { padding:6px 10px; font-size:14px; color:var(--ink-1); max-width:260px;
+  background:var(--page); border:1px solid #3a3a42; border-radius:6px; }
+.empty { padding:40px 0; text-align:center; color:var(--ink-muted); font-size:13px; }
+.player-head { display:flex; align-items:baseline; gap:10px; margin:4px 0 8px; }
+.player-head .name { font-size:22px; font-weight:800; }
+.player-head .pos { font-size:13px; color:var(--ink-muted); }
+.section-h { font-size:12px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:.03em;
+  margin:18px 0 6px; border-left:3px solid var(--red); padding-left:9px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:var(--gap); }
+.row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:8px 0; border-bottom:1px solid var(--grid); }
+.row:last-child { border-bottom:none; }
+.row .lbl { font-size:13px; color:var(--ink-2); }
+.row .val { font-size:16px; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums; text-align:right; }
+.row .note { font-size:11px; font-weight:400; color:var(--ink-muted); margin-top:1px; }
+.kick-mix { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; font-size:12.5px; color:var(--ink-2); }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+thead th { text-align:right; padding:7px 9px; border-bottom:2px solid var(--border); color:var(--gold);
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+thead th:first-child { text-align:left; }
+tbody td { padding:6px 9px; border-bottom:1px solid var(--grid); text-align:right; font-variant-numeric:tabular-nums; }
+tbody td:first-child { text-align:left; }
+footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="index.html">🏉 Toshiba Master Data</a>
+  <div class="navlinks">
+    <a href="index.html">ホーム</a>
+    <a href="rugby.html" class="active">ラグビー</a>
+    <a href="gym.html">ジム</a>
+    <a href="conditioning.html">コンディショニング</a>
+  </div>
+  <span class="spacer"></span>
+  <button id="logout-btn" type="button">ログアウト</button>
+</nav>
+<div class="wrap">
+  <header>
+    <h1>ラグビー個人スタッツ</h1>
+    <div class="sub">Toshiba Brave Lupus Tokyo — Attack / Defense / Kicking / Scrum / Lineout(データ: Opta Stats Perform)</div>
+  </header>
+  <div class="filters">
+    <div class="fg"><label for="f-season">シーズン</label><select id="f-season"></select></div>
+    <div class="fg"><label for="f-player">選手</label><select id="f-player"></select></div>
+  </div>
+  <div id="content"><div class="empty">読み込み中...</div></div>
+  <footer>定義: キャリーゲインm=Distance+ / ポストコンタクトm=Metres3合計 / DF Beaten=Attacking Qualities×Defender Beaten /
+    オフロード=Pass×Offload(結果Own Player/To Ground/To Opposition)、成功=Own Player /
+    タックル成功率=(成功各種+Offload Allowed/Pen Conceded)÷タックル(Missed/Ineffective除外) /
+    ジャッカル=Collection×Jackal、成功=Success / OOA=Ruck OOAのqualifier4(Attacking/Defensive OOA) /
+    キックメーター=Kick in Play区間のDistance+合計 / ラインアウトスロー成功率=個人のWon÷総投球(HOのみ表示) /
+    ラインアウト成功率(捕球)=個人の自チーム投球Won÷総捕球、DFスティール=Lineout TakeのSteal系(LO/FL/No8のみ表示) /
+    アタックスクラム成功率=Offensive Scrum個人参加行のWon系÷総参加数 / ディフェンススクラム成功率=Defensive Scrum個人参加行のうち反則を与えなかった割合。
+    ポジションは選手の生涯最頻出ポジション。データ: Opta(Stats Perform, Level 2 Restricted)。このページはログインしたコーチングスタッフのみ閲覧できます。</footer>
+</div>
+<script>
+const SUPABASE_URL = 'https://lwsrrourcwidrujvaqvr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_WUHxP4DDM9FRN4JfduqDNA_-S3lCM2p';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Embedded payload -- regenerate with scripts/build_rugby_data.py whenever
+// the source project's compare_data.json is refreshed with new match data.
+const RAW = /*RUGBY_DATA_START*/{"team":"Toshiba Brave Lupus Tokyo","comps":["Japan Rugby League One D1"],"players":["Atsuki Kuwayama","Futoshi Mori","Jacob Pierce","Jone Naikabula","Kohei Takahashi","Mamoru Harada","Masataka Mikami","Michael Leitch","Richie Mo'unga","Rob Thompson","Samuela Anise","Sena Kimura","Seta Tamanivalu","Shannon Frizell","Shohei Ito","Taichi Mano","Takeshi Sasaki","Takuro Matsunaga","Taufa Latu","Teruo Makabe","Warner Dearns","Yuhei Sugiyama","Yuto Mori","Netani Vakayalia","Daigo Hashimoto","Takahiro Ogawa","Andrew Makalio","Masaki Hamada","Michael Collins","Nik McCurran","PJ Steenkamp","Yuma Fujino","Yuta Kokaji","Hiroki Yamamoto","Kyosuke Kajikawa","Shohei Toyoshima","Taiki Matsunobu","Asaeli Lausii","Yoshitaka Tokunaga","Hayata Nakao","Rikyu Yamakawa","Motoki Tanaka","Michael Stolberg","Shotaro Ikedo","Gentaro Ikenaga","Toshiki Kuwayama","Tjay Clarke","Afu Ofeina","Callum MacDonald","Rinpei Sakaki","Vea Taumoefolau","Ken Hiyoshi","Rei Ishioka","Taishiro Kido","Stephanus Du Toit","Shuto Harabuchi"],"playerPos":["Left Wing","Hooker","Lock (4)","Right Wing","Scrum Half","Hooker","Loosehead Prop","Number 8","Fly Half","Inside Centre","Lock (5)","Loosehead Prop","Outside Centre","Blindside Flanker","Openside Flanker","Inside Centre","Openside Flanker","Full Back","Tighthead Prop","Tighthead Prop","Lock (5)","Scrum Half","Left Wing","Left Wing","Hooker","Scrum Half","Hooker","Left Wing","Inside Centre","Inside Centre","Lock (4)","Loosehead Prop","Tighthead Prop","Number 8","Lock (5)","Left Wing","Right Wing","Number 8","Openside Flanker","Fly Half","Tighthead Prop","Scrum Half","Lock (5)","Scrum Half","Outside Centre","Right Wing","Left Wing","Blindside Flanker","Lock (4)","Hooker","Tighthead Prop","Hooker","Right Wing","Openside Flanker","Inside Centre","Loosehead Prop"],"pmet":["playtime","actions","atk_ooa","def_ooa","carries","carry_distplus","carry_post","def_beaten","linebreak","offload","offload_success","passes","tackles","tk_succ","tk_dominant","tk_missed","jackal","jackal_won","kicks","kick_mtr","kick_retained","kick_pressure","kick_notsecured","kick_lost","kick_touch","kick_error","lo_throw_total","lo_throw_won","lo_catch_total","lo_catch_won","lo_steal","off_scrum_total","off_scrum_success","def_scrum_total","def_scrum_pressure","def_scrum_success"],"P":[[2024,0,13,912.5,463,83,39,67,891.0,336.0,26,22,6,2,36,98,72,6,25,1,1,9,142.0,0,0,1,2,2,4,0,0,1,1,0,0,0,0,0,0],[2024,1,2,37.5,40,4,1,1,6.0,2.0,0,0,0,0,2,9,8,1,1,0,0,0,0.0,0,0,0,0,0,0,8,6,0,0,0,8,5,1,0,0],[2024,2,14,904.6,988,222,98,78,364.0,124.0,11,1,10,6,68,162,148,19,14,7,3,1,36.0,0,0,0,0,1,0,0,0,28,28,6,92,72,113,10,83],[2024,3,11,716.9,426,73,27,75,984.0,393.0,38,25,6,3,28,94,78,8,15,2,2,11,272.0,4,0,0,3,4,0,0,0,1,1,0,0,0,0,0,0],[2024,4,9,242.2,462,9,13,11,73.0,34.0,3,3,3,3,214,43,33,2,9,3,2,21,443.0,0,1,0,13,5,2,0,0,2,2,0,0,0,0,0,0],[2024,5,17,966.1,1125,176,59,118,622.0,231.0,31,6,1,1,39,191,171,10,18,4,4,2,75.0,0,0,0,2,0,0,157,136,0,0,3,102,82,109,10,84],[2024,6,14,383.7,407,123,20,23,90.0,30.0,0,0,0,0,10,94,82,5,12,0,0,0,0.0,0,0,0,0,0,0,0,0,3,3,0,49,39,39,2,23],[2024,7,12,840.9,939,145,82,115,539.0,186.0,19,3,11,9,53,213,195,21,15,4,0,0,0.0,0,0,0,0,0,0,0,0,7,7,2,86,64,90,7,61],[2024,8,15,1185.3,1479,37,14,151,1345.0,538.0,74,13,20,14,395,116,82,2,28,0,0,270,5855.0,9,4,2,98,145,12,0,0,4,4,0,0,0,0,0,0],[2024,9,10,573.6,344,51,19,61,577.0,244.0,25,10,11,6,53,68,52,4,14,0,0,6,120.0,0,0,0,4,1,1,0,0,0,0,0,0,0,0,0,0],[2024,10,13,408.0,444,81,25,61,241.0,80.0,5,0,2,1,19,68,63,1,3,1,0,0,0.0,0,0,0,0,0,0,0,0,13,13,0,49,39,41,2,26],[2024,11,14,755.6,667,197,24,50,235.0,100.0,9,1,3,3,28,111,103,5,8,1,1,0,0.0,0,0,0,0,0,0,0,0,0,0,0,71,54,91,10,62],[2024,12,15,802.6,473,68,46,91,636.0,239.0,25,10,27,17,65,96,69,5,24,13,10,4,62.0,1,0,0,2,0,1,0,0,0,0,0,0,0,0,0,0],[2024,13,17,1304.1,1335,210,65,168,1026.0,438.0,44,13,25,14,116,226,194,24,29,2,2,1,30.0,0,0,0,1,0,0,0,0,29,29,3,144,112,135,9,100],[2024,14,16,837.8,692,140,26,53,335.0,87.0,1,3,1,0,33,143,117,6,24,3,1,3,61.0,0,0,0,3,0,0,0,0,15,15,3,96,78,98,8,65],[2024,15,13,680.3,572,103,28,100,723.0,277.0,31,5,4,4,62,130,116,4,13,3,2,12,422.0,0,0,0,9,1,2,0,0,3,3,0,0,0,0,0,0],[2024,16,14,946.2,955,207,79,68,541.0,210.0,20,8,8,6,39,225,201,18,24,7,7,1,16.0,0,0,0,1,0,0,0,0,3,3,0,95,73,116,12,79],[2024,17,17,1338.9,866,144,17,158,1485.0,381.0,34,19,10,7,129,111,82,4,27,0,0,69,2277.0,0,0,0,32,32,5,0,0,2,2,0,0,0,0,0,0],[2024,18,13,409.8,416,91,24,45,176.0,42.0,1,0,3,3,12,85,75,4,10,3,2,0,0.0,0,0,0,0,0,0,0,0,1,1,0,42,33,48,2,31],[2024,19,15,640.9,540,148,22,32,116.0,29.0,0,1,1,0,14,112,101,6,10,2,1,0,0.0,0,0,0,0,0,0,0,0,3,3,0,73,57,72,2,48],[2024,20,17,1334.5,1335,232,76,146,766.0,345.0,18,4,11,8,103,236,208,15,26,5,4,0,0.0,0,0,0,0,0,0,0,0,66,66,10,148,116,150,9,103],[2024,21,17,959.5,1757,22,27,42,164.0,52.0,9,5,6,5,915,129,102,4,26,2,1,36,803.0,2,0,1,21,9,3,0,0,0,0,0,0,0,0,0,0],[2024,22,17,760.1,418,66,12,62,618.0,196.0,34,15,8,8,58,76,61,2,10,2,2,17,576.0,0,0,0,11,6,0,0,0,0,0,0,0,0,0,0,0],[2024,24,17,456.8,554,119,33,45,243.0,95.0,9,2,1,1,14,102,91,4,11,2,1,0,0.0,0,0,0,0,0,0,65,53,0,0,0,47,36,59,3,31],[2024,25,5,249.0,427,6,3,15,67.0,40.0,3,2,3,1,239,22,11,1,10,0,0,17,412.0,0,0,0,9,6,2,0,0,0,0,0,0,0,0,0,0],[2024,27,6,327.2,134,26,2,27,273.0,131.0,11,7,1,1,8,30,23,3,6,1,0,1,17.0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0],[2024,28,10,551.9,359,47,10,65,522.0,150.0,12,10,14,10,67,50,41,1,8,1,1,24,624.0,1,1,0,15,5,2,0,0,1,1,0,0,0,0,0,0],[2024,29,10,553.9,346,39,19,61,555.0,216.0,18,14,7,4,60,71,61,4,10,0,0,3,61.0,0,0,1,2,0,0,0,0,1,1,0,0,0,0,0,0],[2024,30,3,146.7,177,36,22,16,78.0,15.0,1,1,2,0,9,34,29,5,5,1,1,0,0.0,0,0,0,0,0,0,0,0,7,7,0,10,8,24,4,14],[2024,31,2,30.2,28,2,1,1,3.0,2.0,0,0,0,0,1,10,9,1,1,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,4,2,4,0,2],[2024,32,12,678.7,644,179,29,46,227.0,74.0,2,1,5,3,21,141,126,5,14,1,1,0,0.0,0,0,0,0,0,0,0,0,0,0,1,73,59,77,8,59],[2024,33,3,59.4,65,24,1,5,32.0,17.0,0,0,0,0,5,3,3,1,0,0,0,0,0.0,0,0,0,0,0,0,0,0,2,2,0,10,9,6,1,3],[2024,34,2,50.4,51,16,1,0,0.0,0.0,0,0,0,0,0,13,10,0,3,0,0,0,0.0,0,0,0,0,0,0,0,0,2,2,0,7,5,8,0,2],[2024,35,2,56.0,32,7,2,5,47.0,15.0,2,1,0,0,4,1,0,0,1,0,0,4,125.0,0,0,0,2,2,0,0,0,0,0,0,0,0,0,0,0],[2024,36,2,93.3,31,4,1,4,41.0,12.0,2,1,0,0,1,14,13,1,1,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[2024,37,5,142.3,150,23,9,18,145.0,80.0,12,3,0,0,1,27,23,1,4,0,0,1,17.0,1,0,0,0,0,0,0,0,3,3,0,13,11,23,2,10],[2024,38,8,311.8,293,70,16,26,148.0,41.0,4,2,5,5,15,61,52,0,8,1,0,0,0.0,0,0,0,0,0,0,0,0,6,6,0,33,26,34,1,27],[2024,39,2,160.8,160,7,2,18,143.0,26.0,3,0,1,1,31,11,8,0,3,0,0,45,1403.0,2,1,0,21,19,2,0,0,0,0,0,0,0,0,0,0],[2024,40,1,22.7,22,6,0,2,8.0,3.0,0,0,0,0,0,2,2,0,0,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,2,2,7,2,5],[2024,41,1,20.3,30,1,0,0,0.0,0.0,0,0,0,0,12,9,5,0,3,0,0,2,62.0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0],[2025,0,7,345.9,218,25,5,49,578.0,143.0,19,15,8,3,29,37,26,2,11,1,1,3,34.0,0,0,0,1,0,2,0,0,0,0,0,0,0,0,0,0],[2025,24,20,567.5,685,94,33,80,604.0,227.0,15,14,0,0,29,105,97,1,8,3,3,0,0.0,0,0,0,0,0,0,86,74,0,0,6,59,50,63,1,48],[2025,33,2,76.3,67,21,2,5,43.0,14.0,0,2,2,1,3,16,14,1,2,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,4,2,10,1,9],[2025,2,19,1361.4,1402,313,115,112,547.0,201.0,14,9,12,10,141,213,189,11,19,10,5,0,0.0,0,0,0,0,0,0,0,0,66,66,7,139,115,143,6,108],[2025,3,16,1217.1,686,88,23,132,1650.0,573.0,56,39,18,12,66,166,122,6,43,1,1,20,553.0,1,1,1,13,3,1,0,0,0,0,0,0,0,0,0,0],[2025,5,20,1051.5,1142,210,44,77,442.0,155.0,21,9,4,4,44,220,195,11,22,4,4,1,13.0,0,0,0,1,0,0,186,164,0,0,2,108,89,116,6,92],[2025,6,12,238.7,256,68,5,18,67.0,35.0,0,0,0,0,5,63,55,1,8,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,29,24,30,1,24],[2025,7,20,1559.0,1755,287,76,218,1271.0,442.0,48,14,13,10,136,335,313,14,19,6,4,1,18.0,0,0,0,1,0,0,0,0,44,44,4,158,130,168,7,133],[2025,8,18,1411.7,1860,67,20,206,1952.0,689.0,89,34,36,28,559,146,108,8,34,1,1,311,6279.0,9,1,4,95,187,15,0,0,9,9,0,0,0,0,0,0],[2025,10,13,303.5,306,62,19,31,111.0,38.0,0,0,0,0,15,40,30,3,10,1,1,0,0.0,0,0,0,0,0,0,0,0,9,9,0,30,27,35,1,29],[2025,11,19,1182.3,917,234,26,68,319.0,129.0,10,3,0,0,35,182,162,1,19,1,1,0,0.0,0,0,0,0,0,0,0,0,0,0,0,124,103,127,5,101],[2025,12,16,1136.8,690,62,55,139,1120.0,386.0,31,17,34,24,135,124,97,6,25,5,5,14,360.0,2,0,1,9,1,1,0,0,1,1,0,0,0,0,0,0],[2025,13,18,1386.9,1478,209,48,215,1367.0,576.0,61,19,31,16,166,234,197,9,36,3,2,2,20.0,0,0,0,2,0,0,0,0,16,16,5,148,123,155,7,119],[2025,14,19,728.0,743,167,38,63,376.0,98.0,4,4,3,1,43,162,140,6,22,1,1,0,0.0,0,0,0,0,0,0,0,0,6,6,1,83,68,86,2,70],[2025,43,4,68.2,114,1,0,3,5.0,1.0,0,0,0,0,53,11,7,0,4,0,0,9,236.0,2,0,0,3,4,0,0,0,0,0,0,0,0,0,0,0],[2025,15,16,751.1,567,79,26,88,800.0,348.0,47,11,10,9,86,144,133,11,11,2,2,9,275.0,0,0,1,4,1,3,0,0,1,1,0,0,0,0,0,0],[2025,16,19,1200.8,1157,233,76,103,709.0,246.0,19,8,18,10,59,269,229,11,37,11,9,0,0.0,0,0,0,0,0,0,0,0,4,4,0,121,100,134,4,103],[2025,17,17,1349.0,1106,92,17,161,1816.0,592.0,57,36,17,10,245,114,84,2,29,0,0,92,2704.0,2,0,0,45,42,3,0,0,1,1,0,0,0,0,0,0],[2025,19,16,351.5,308,73,7,28,120.0,44.0,2,1,1,1,9,64,52,0,12,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,32,28,41,2,29],[2025,21,20,1172.2,2228,19,19,41,209.0,64.0,9,13,7,6,1230,118,88,0,28,0,0,25,539.0,2,2,0,12,5,4,0,0,2,2,0,0,0,0,0,0],[2025,32,18,866.6,795,183,29,73,397.0,147.0,13,4,4,4,30,185,167,6,16,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,83,68,92,4,73],[2025,22,19,1206.6,586,100,23,82,1022.0,311.0,28,40,9,8,110,93,79,1,13,0,0,21,609.0,4,0,1,7,6,3,0,0,0,0,0,0,0,0,0,0],[2025,9,18,1155.9,858,94,40,174,1447.0,580.0,69,26,37,26,153,161,126,7,32,3,2,15,347.0,0,0,1,9,1,4,0,0,1,1,1,0,0,0,0,0],[2025,20,15,1114.0,1023,161,33,101,433.0,177.0,12,5,5,5,101,149,134,6,11,4,1,2,7.0,0,0,0,0,1,1,0,0,83,83,14,113,97,121,6,95],[2025,38,11,295.6,320,62,16,30,234.0,96.0,11,3,5,4,16,74,59,3,14,0,0,1,35.0,0,0,0,0,1,0,0,0,0,0,0,32,27,34,1,28],[2025,28,15,534.1,375,58,9,51,416.0,89.0,13,13,15,12,92,62,54,1,7,0,0,19,518.0,0,0,0,12,5,2,0,0,0,0,0,0,0,0,0,0],[2025,44,2,16.8,11,0,1,1,3.0,0.0,0,0,1,1,1,2,2,0,0,0,0,2,22.0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0],[2025,4,3,41.4,85,2,5,4,8.0,2.0,0,0,1,1,48,10,10,0,0,2,2,0,0.0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[2025,27,1,16.1,8,3,0,1,13.0,8.0,1,1,1,1,2,0,0,0,0,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[2025,18,15,584.7,515,106,28,52,234.0,107.0,7,2,2,2,18,82,72,2,9,1,0,0,0.0,0,0,0,0,0,0,0,0,0,0,1,66,55,68,2,53],[2025,37,1,6.3,7,1,0,1,6.0,2.0,0,0,0,0,1,1,1,0,0,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1],[2025,25,12,316.9,599,11,8,19,124.0,76.0,6,6,1,1,275,37,28,1,8,0,0,12,260.0,0,0,0,4,7,1,0,0,0,0,0,0,0,0,0,0],[2025,35,8,292.6,138,13,2,28,328.0,102.0,11,5,1,1,21,18,9,0,9,0,0,4,169.0,0,0,1,3,0,0,0,0,0,0,0,0,0,0,0,0],[2025,45,4,227.8,102,20,3,23,187.0,40.0,2,3,0,0,7,18,13,0,5,0,0,2,25.0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0],[2026,47,11,493.8,486,88,25,57,375.0,141.0,5,4,0,0,22,91,80,1,10,1,0,0,0.0,0,0,0,0,0,0,0,0,1,1,0,52,40,62,3,40],[2026,48,11,202.6,224,46,3,28,211.0,90.0,4,4,0,0,10,44,42,2,2,0,0,0,0.0,0,0,0,0,0,0,0,0,1,1,1,18,12,26,3,16],[2026,24,6,361.0,377,67,16,24,184.0,59.0,3,4,0,0,23,74,65,0,8,1,0,0,0.0,0,0,0,0,0,0,61,49,0,0,0,23,15,42,2,28],[2026,33,17,1045.5,908,166,66,67,443.0,174.0,11,9,3,2,57,186,171,10,13,10,10,1,8.0,0,0,0,1,0,0,0,0,29,29,1,101,73,116,7,77],[2026,2,19,1292.5,1204,258,119,104,473.0,176.0,7,2,15,12,84,193,181,6,11,8,3,0,0.0,0,0,0,0,0,0,0,0,35,35,0,123,91,149,6,99],[2026,4,18,968.2,1660,15,58,57,196.0,74.0,10,5,12,10,801,124,83,3,31,11,8,23,534.0,1,2,1,10,6,3,0,0,1,1,0,0,0,0,0,0],[2026,6,7,94.5,110,27,3,6,24.0,12.0,1,0,0,0,6,17,14,1,3,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,8,4,19,2,11],[2026,42,19,1527.4,1459,327,114,92,602.0,230.0,16,9,9,5,139,228,199,10,25,5,4,0,0.0,0,0,0,0,0,0,0,0,99,99,9,144,103,182,10,119],[2026,23,4,266.1,118,27,6,19,156.0,37.0,5,4,4,4,12,21,19,1,2,1,1,2,38.0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0],[2026,8,18,1430.4,1812,55,19,165,1404.0,575.0,94,17,19,15,558,137,106,5,25,0,0,312,6497.0,7,4,5,105,179,12,0,0,12,12,0,0,0,0,0,0],[2026,49,19,567.6,656,131,22,52,289.0,110.0,7,3,2,1,41,112,98,5,14,4,4,0,0.0,0,0,0,0,0,0,87,70,0,0,0,58,40,68,7,44],[2026,9,13,874.8,614,80,16,124,939.0,388.0,56,11,20,15,125,100,79,4,21,1,1,10,246.0,1,0,0,8,0,1,0,0,1,1,0,0,0,0,0,0],[2026,11,18,1172.3,872,192,26,65,294.0,88.0,4,0,5,4,48,183,161,5,20,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,110,83,138,5,92],[2026,12,16,1119.1,577,91,56,107,757.0,228.0,21,2,19,14,94,103,87,4,15,3,3,5,68.0,1,1,0,2,0,1,0,0,0,0,0,0,0,0,0,0],[2026,13,2,130.3,146,20,11,20,100.0,58.0,4,2,2,1,13,18,17,1,1,1,1,0,0.0,0,0,0,0,0,0,0,0,0,0,0,8,7,17,1,11],[2026,15,5,305.5,198,29,10,29,201.0,76.0,8,3,3,1,32,41,38,2,3,0,0,7,199.0,0,0,0,3,3,1,0,0,0,0,0,0,0,0,0,0],[2026,16,16,1031.0,953,171,59,89,721.0,259.0,16,14,13,8,55,234,207,14,23,8,5,1,9.0,1,0,0,0,0,0,0,0,4,4,0,95,64,126,8,83],[2026,17,19,1523.6,1006,108,7,198,1713.0,458.0,35,19,6,3,220,84,50,3,28,0,0,65,1835.0,1,2,0,24,30,8,0,0,2,2,0,0,0,0,0,0],[2026,46,6,373.7,185,35,3,34,439.0,123.0,13,11,4,2,11,34,24,2,10,0,0,10,359.0,0,0,0,9,1,0,0,0,0,0,0,0,0,0,0,0],[2026,45,8,374.1,215,38,6,33,332.0,115.0,5,8,5,5,20,54,37,2,17,0,0,2,98.0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0],[2026,50,10,565.0,495,84,18,53,310.0,119.0,8,1,8,5,31,86,78,8,7,2,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,49,36,74,4,49],[2026,21,16,426.6,827,10,13,16,109.0,29.0,3,4,2,2,439,41,29,1,11,2,2,13,233.0,3,0,0,6,3,1,0,0,1,1,0,0,0,0,0,0],[2026,32,18,734.5,638,147,25,62,330.0,127.0,3,5,6,4,27,116,100,3,16,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,72,54,83,4,57],[2026,51,4,39.3,53,8,2,4,21.0,7.0,0,0,0,0,0,15,13,1,2,0,0,0,0.0,0,0,0,0,0,0,5,4,0,0,0,7,3,4,0,1],[2026,28,18,997.7,559,102,12,74,642.0,165.0,7,10,17,14,178,89,72,4,16,1,1,10,219.0,1,0,0,5,4,0,0,0,0,0,0,0,0,0,0,0],[2026,52,17,831.3,391,58,7,75,840.0,256.0,20,21,8,5,34,95,70,4,24,0,0,11,325.0,1,0,1,5,3,1,0,0,1,1,0,0,0,0,0,0],[2026,53,5,130.9,146,27,10,8,55.0,18.0,2,1,2,1,7,41,38,1,3,2,2,0,0.0,0,0,0,0,0,0,0,0,2,2,0,8,5,24,3,12],[2026,19,16,351.7,309,58,13,32,171.0,77.0,1,4,0,0,12,60,49,0,11,1,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,40,23,34,5,20],[2026,14,13,290.8,255,46,20,23,177.0,49.0,1,2,2,1,19,45,39,1,6,0,0,0,0.0,0,0,0,0,0,0,0,0,3,3,0,31,19,30,3,21],[2026,26,9,569.4,564,85,18,40,248.0,87.0,9,1,1,1,35,83,70,4,11,0,0,0,0.0,0,0,0,0,0,0,111,93,0,0,0,57,46,68,1,46],[2026,7,13,1029.2,1036,153,41,144,929.0,323.0,27,7,11,9,84,182,161,3,18,3,3,0,0.0,0,0,0,0,0,0,0,0,31,31,1,90,67,119,5,79],[2026,35,6,340.5,140,16,0,25,214.0,53.0,4,6,2,2,22,29,17,0,10,0,0,9,311.0,1,0,0,7,0,1,0,0,0,0,0,0,0,0,0,0],[2026,54,4,76.2,57,10,4,8,99.0,41.0,2,2,0,0,10,7,6,2,1,1,1,2,42.0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0],[2026,0,1,62.1,28,11,1,1,4.0,0.0,0,0,0,0,1,8,5,0,3,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[2026,55,5,97.2,76,13,4,7,46.0,15.0,0,0,0,0,2,17,15,0,1,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,8,5,10,0,5],[2026,44,1,28.2,20,3,0,2,13.0,0.0,0,0,0,0,2,7,3,0,4,0,0,1,6.0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],[2026,25,4,140.2,241,6,1,8,40.0,12.0,0,1,0,0,120,13,8,0,4,0,0,6,161.0,1,0,0,1,4,0,0,0,0,0,0,0,0,0,0,0],[2026,27,4,260.4,144,36,6,26,278.0,115.0,11,4,2,1,11,26,21,3,5,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[2026,43,5,56.7,43,11,1,4,39.0,9.0,0,1,0,0,9,3,1,0,2,0,0,1,58.0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],[2026,38,7,480.1,387,81,11,39,210.0,74.0,7,0,6,4,25,78,66,8,12,0,0,1,35.0,0,0,0,1,0,0,0,0,3,3,0,51,36,54,1,36],[2026,37,2,44.6,45,10,1,10,52.0,22.0,0,0,0,0,1,4,3,0,1,0,0,0,0.0,0,0,0,0,0,0,0,0,0,0,0,3,3,6,0,4],[2026,3,4,236.4,132,16,7,24,283.0,143.0,13,4,0,0,12,28,23,4,4,0,0,3,65.0,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0]]}/*RUGBY_DATA_END*/;
+
+const PM = RAW.pmet;
+const pIdx = {}; PM.forEach((m,i)=>pIdx[m]=3+i); // P row: [season, playerIdx, gp, ...pmet]
+const HO_POS = new Set(['Hooker']);
+const LO_POS = new Set(['Lock (4)','Lock (5)','Openside Flanker','Blindside Flanker','Number 8']);
+
+function seasonLabel(y){ return `${y}-${String(y+1).slice(2)}`; }
+function pct(n,d){ return d ? (n/d*100) : 0; }
+function fmt(x, digits){ return digits===0 ? Math.round(x).toLocaleString() : x.toFixed(digits); }
+function v(id){ return document.getElementById(id).value; }
+
+function rowsFor(playerIdx){
+  const season = v('f-season');
+  return RAW.P.filter(r => r[1]===playerIdx && (season==='all' || String(r[0])===season));
+}
+function emptyAcc(){ const c={}; PM.forEach(m=>c[m]=0); c.__m=0; return c; }
+function accumFor(playerIdx){
+  const acc = emptyAcc();
+  rowsFor(playerIdx).forEach(r=>{ acc.__m += r[2]; PM.forEach(m=>acc[m]+=r[pIdx[m]]); });
+  return acc;
+}
+
+function section(container, title){
+  const h = document.createElement('div'); h.className='section-h'; h.textContent = title;
+  container.appendChild(h);
+  const card = document.createElement('div'); card.className='card';
+  container.appendChild(card);
+  return card;
+}
+function statRow(card, label, val, digits, note){
+  const row = document.createElement('div'); row.className='row';
+  const disp = val==null ? '–' : fmt(val, digits);
+  row.innerHTML = `<div class="lbl">${label}</div><div class="val">${disp}${note?`<div class="note">${note}</div>`:''}</div>`;
+  card.appendChild(row);
+}
+function totalAvgRow(card, label, c, key, digits){
+  const tot = c[key], avg = c.__m ? tot/c.__m : 0;
+  statRow(card, label, avg, 1, `合計 ${fmt(tot,digits)}`);
+}
+function pctRow(card, label, c, numKey, denKey){
+  statRow(card, label, pct(c[numKey], c[denKey]), 1, `${c[numKey]} / ${c[denKey]}`);
+}
+function kickMix(card, c){
+  const keys = {kick_retained:'再獲得', kick_pressure:'相手エラー誘発', kick_notsecured:'確保失敗',
+    kick_lost:'相手確保', kick_touch:'タッチ', kick_error:'エラー'};
+  const mix = document.createElement('div'); mix.className='kick-mix';
+  Object.entries(keys).forEach(([k,label])=>{
+    const p = pct(c[k], c.kicks);
+    const el = document.createElement('div');
+    el.textContent = `${label}: ${c[k]} (${p.toFixed(0)}%)`;
+    mix.appendChild(el);
+  });
+  card.appendChild(mix);
+}
+function playtimeTable(playerIdx){
+  const rows = rowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0]);
+  const wrap = document.createElement('div');
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>シーズン</th><th>プレー時間(分)</th><th>出場試合数</th><th>平均プレー時間(分)</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  rows.forEach(r=>{
+    const gp = r[2], mins = r[pIdx.playtime];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${seasonLabel(r[0])}</td><td>${Math.round(mins)}</td><td>${gp}</td><td>${gp?(mins/gp).toFixed(1):'–'}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody); wrap.appendChild(table);
+  return wrap;
+}
+function fwBlock(container, pos, c){
+  if (HO_POS.has(pos)){
+    const card = section(container, 'フォワード専門スタッツ — Hooker');
+    const p = c.lo_throw_total ? pct(c.lo_throw_won, c.lo_throw_total) : null;
+    statRow(card, 'ラインアウトスロー成功率', p, 1, `スロー数: ${c.lo_throw_total}`);
+  }
+  if (LO_POS.has(pos)){
+    const card = section(container, 'フォワード専門スタッツ — ' + pos);
+    const catchP = c.lo_catch_total ? pct(c.lo_catch_won, c.lo_catch_total) : null;
+    statRow(card, 'ラインアウト成功率(捕球)', catchP, 1, `ATキャッチ数: ${c.lo_catch_total}`);
+    statRow(card, 'DFラインアウトスティール数', c.lo_steal, 0, c.__m ? (c.lo_steal/c.__m).toFixed(1)+'/match' : '');
+  }
+}
+function scrumBlock(container, c){
+  const hasOff = c.off_scrum_total > 0, hasDef = c.def_scrum_total > 0;
+  if (!hasOff && !hasDef) return;
+  const card = section(container, 'スクラム');
+  if (hasOff) pctRow(card, 'アタックスクラム成功率', c, 'off_scrum_success', 'off_scrum_total');
+  if (hasDef){
+    statRow(card, 'ディフェンススクラムPressure%', c.def_scrum_total ? pct(c.def_scrum_pressure, c.def_scrum_total) : null, 1,
+      `${c.def_scrum_pressure} / ${c.def_scrum_total}`);
+    statRow(card, 'ディフェンススクラム成功率', c.def_scrum_total ? pct(c.def_scrum_success, c.def_scrum_total) : null, 1,
+      `${c.def_scrum_success} / ${c.def_scrum_total}`);
+  }
+}
+
+function fillFilters(){
+  const seasons = [...new Set(RAW.P.map(r=>r[0]))].sort((a,b)=>b-a);
+  const sSel = document.getElementById('f-season');
+  sSel.replaceChildren(new Option('すべて', 'all'));
+  seasons.forEach(y => sSel.appendChild(new Option(seasonLabel(y), String(y))));
+
+  const pSel = document.getElementById('f-player');
+  const order = RAW.players.map((name,i)=>({name,i})).sort((a,b)=>a.name.localeCompare(b.name));
+  order.forEach(({name,i}) => pSel.appendChild(new Option(name, String(i))));
+}
+
+function render(){
+  const content = document.getElementById('content');
+  const playerIdx = Number(v('f-player'));
+  if (!RAW.players.length){
+    content.innerHTML = '<div class="empty">表示できるデータがありません</div>';
+    return;
+  }
+  const pos = RAW.playerPos[playerIdx];
+  const c = accumFor(playerIdx);
+
+  content.replaceChildren();
+  const head = document.createElement('div'); head.className = 'player-head';
+  head.innerHTML = `<div class="name">${RAW.players[playerIdx]}</div><div class="pos">${pos || ''}</div>`;
+  content.appendChild(head);
+
+  const ptCard = section(content, 'プレータイム(シーズン別、フィルタ非依存)');
+  ptCard.appendChild(playtimeTable(playerIdx));
+
+  const atk = section(content, 'アタック');
+  totalAvgRow(atk, 'キャリー', c, 'carries', 0);
+  totalAvgRow(atk, 'キャリーゲインm', c, 'carry_distplus', 0);
+  totalAvgRow(atk, 'ポストコンタクトm', c, 'carry_post', 0);
+  totalAvgRow(atk, 'DF Beaten', c, 'def_beaten', 0);
+  totalAvgRow(atk, 'オフロード', c, 'offload', 0);
+  pctRow(atk, 'オフロード成功率', c, 'offload_success', 'offload');
+  totalAvgRow(atk, 'ラインブレイク', c, 'linebreak', 0);
+  totalAvgRow(atk, 'パス', c, 'passes', 0);
+
+  const def = section(content, 'ディフェンス');
+  totalAvgRow(def, 'タックル', c, 'tackles', 0);
+  pctRow(def, 'タックル成功率', c, 'tk_succ', 'tackles');
+  totalAvgRow(def, 'ジャッカル', c, 'jackal', 0);
+  pctRow(def, 'ジャッカル成功率', c, 'jackal_won', 'jackal');
+
+  const ooa = section(content, 'ブレイクダウン関与(Ruck OOA)');
+  totalAvgRow(ooa, 'アタックOOA', c, 'atk_ooa', 0);
+  totalAvgRow(ooa, 'ディフェンスOOA', c, 'def_ooa', 0);
+
+  const kick = section(content, 'キック');
+  totalAvgRow(kick, 'キック数', c, 'kicks', 0);
+  totalAvgRow(kick, 'キックメーター', c, 'kick_mtr', 0);
+  kickMix(kick, c);
+
+  const other = section(content, 'その他');
+  statRow(other, 'Action/Min', c.playtime ? c.actions/c.playtime : 0, 2);
+
+  fwBlock(content, pos, c);
+  scrumBlock(content, c);
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+  location.href = 'login.html';
+}
+document.getElementById('logout-btn').addEventListener('click', doLogout);
+document.getElementById('f-season').addEventListener('change', render);
+document.getElementById('f-player').addEventListener('change', render);
+
+async function init(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session){
+    location.href = 'login.html?next=rugby.html';
+    return;
+  }
+  // This page's data (RAW above) is embedded static JSON, not a live
+  // Supabase query -- the session check above just gates the page itself,
+  // consistent with how the other Toshiba Master Data pages work.
+  if (!RAW.players.length){
+    document.getElementById('content').innerHTML = '<div class="empty">データが読み込まれていません</div>';
+    return;
+  }
+  fillFilters();
+  render();
+}
+init();
+</script>
+</body>
+</html>

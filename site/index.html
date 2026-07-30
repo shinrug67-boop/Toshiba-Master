@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toshiba Master Data</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { color-scheme: dark;
+  --page:#08080a; --surface:#14141a; --ink-1:#f3f4f6; --ink-2:#c9cdd6; --ink-muted:#a0aec0;
+  --border:rgba(197,160,89,.28); --gold:#c5a059; --red:#ff0b24; --radius:8px; --gap:14px; }
+body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:var(--page); color:var(--ink-1); line-height:1.5; }
+.topnav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  background:var(--surface);border-bottom:1px solid var(--border);padding:10px 18px;}
+.topnav .brand{font-weight:800;font-size:15px;color:var(--gold);text-decoration:none;white-space:nowrap;letter-spacing:.02em;}
+.topnav .navlinks{display:flex;gap:4px;flex-wrap:wrap;}
+.topnav .navlinks a{font-size:13px;color:var(--ink-2);text-decoration:none;padding:6px 12px;border-radius:6px;white-space:nowrap;font-weight:600;}
+.topnav .navlinks a:hover{background:rgba(255,255,255,.06);}
+.topnav .navlinks a.active{background:var(--red);color:#fff;}
+.topnav .spacer{flex:1;}
+#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+  border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
+#logout-btn:hover{background:rgba(255,255,255,.06);}
+.wrap { max-width:900px; margin:0 auto; padding:40px var(--gap) 40px; }
+header h1 { font-size:26px; font-weight:800; }
+header .sub { font-size:13px; color:var(--ink-2); margin-top:4px; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--gap); margin-top:28px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:22px;
+  text-decoration:none; color:var(--ink-1); border-top:3px solid var(--red); transition:border-color .1s; }
+.card:hover { border-top-color:var(--gold); background:rgba(255,255,255,.03); }
+.card .icon { font-size:28px; margin-bottom:10px; }
+.card .title { font-size:16px; font-weight:700; margin-bottom:4px; }
+.card .desc { font-size:12.5px; color:var(--ink-muted); }
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="index.html">🏉 Toshiba Master Data</a>
+  <div class="navlinks">
+    <a href="index.html" class="active">ホーム</a>
+    <a href="rugby.html">ラグビー</a>
+    <a href="gym.html">ジム</a>
+    <a href="conditioning.html">コンディショニング</a>
+  </div>
+  <span class="spacer"></span>
+  <button id="logout-btn" type="button">ログアウト</button>
+</nav>
+<div class="wrap">
+  <header>
+    <h1>Toshiba Master Data</h1>
+    <div class="sub">Toshiba Brave Lupus Tokyo — ラグビー・ジム・コンディショニングを1つに統合</div>
+  </header>
+  <div class="cards">
+    <a class="card" href="rugby.html">
+      <div class="icon">🏉</div>
+      <div class="title">ラグビー</div>
+      <div class="desc">選手個人のAttack / Defense / Kicking / Scrum / Lineoutスタッツ</div>
+    </a>
+    <a class="card" href="gym.html">
+      <div class="icon">🏋️</div>
+      <div class="title">ジム</div>
+      <div class="desc">測定・トレーニングデータ(準備中)</div>
+    </a>
+    <a class="card" href="conditioning.html">
+      <div class="icon">🩹</div>
+      <div class="title">コンディショニング</div>
+      <div class="desc">ケガの発生履歴・復帰状況</div>
+    </a>
+  </div>
+</div>
+<script>
+const SUPABASE_URL = 'https://lwsrrourcwidrujvaqvr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_WUHxP4DDM9FRN4JfduqDNA_-S3lCM2p';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function doLogout(){
+  await sb.auth.signOut();
+  location.href = 'login.html';
+}
+document.getElementById('logout-btn').addEventListener('click', doLogout);
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) location.href = 'login.html?next=index.html';
+})();
+</script>
+</body>
+</html>

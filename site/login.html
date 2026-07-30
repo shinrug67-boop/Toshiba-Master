@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ログイン — Toshiba Master Data</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root { color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink-1:#0b0b0b; --ink-2:#52514e; --ink-muted:#898781;
+  --border:rgba(11,11,11,0.10); --radius:10px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+  --border:rgba(255,255,255,0.10); } }
+body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:var(--page); color:var(--ink-1); line-height:1.5;
+  min-height:100vh; display:flex; align-items:center; justify-content:center; }
+.login-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:30px 32px; width:100%; max-width:340px; }
+.login-card .brand { font-weight:700; font-size:15px; margin-bottom:4px; }
+.login-card .brand-sub { font-size:12px; color:var(--ink-muted); margin-bottom:18px; }
+.login-card h2 { font-size:18px; font-weight:700; margin-bottom:16px; }
+.login-card input { width:100%; padding:10px 12px; font-size:16px; margin-bottom:10px;
+  background:var(--page); border:1px solid var(--border); border-radius:6px; color:var(--ink-1); }
+.login-card button { width:100%; padding:10px; font-size:14px; font-weight:600; color:#fff; background:#2a78d6;
+  border:none; border-radius:6px; cursor:pointer; margin-top:4px; }
+.login-card button:hover { background:#1f63b5; }
+.login-card button:disabled { opacity:.6; cursor:default; }
+.login-card .err { color:#d64545; font-size:12px; margin-top:8px; min-height:1em; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="brand">🏉 Toshiba Master Data</div>
+  <div class="brand-sub">コーチングスタッフ専用</div>
+  <h2>ログイン</h2>
+  <input id="login-email" type="email" autocomplete="username" placeholder="email@example.com">
+  <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
+  <button id="login-submit" type="button">ログイン</button>
+  <div class="err" id="login-error"></div>
+</div>
+<script>
+// Same Supabase project as the match-stats dashboard (Rugby Total Data/handoff) --
+// this app's own tables (squad_players/injuries) live in that same project,
+// gated by RLS policies that only allow rows through for emails listed in
+// coaching_staff_emails.
+const SUPABASE_URL = 'https://lwsrrourcwidrujvaqvr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_WUHxP4DDM9FRN4JfduqDNA_-S3lCM2p';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function nextPath(){
+  const p = new URLSearchParams(location.search).get('next');
+  return (p && !p.startsWith('http')) ? p : 'index.html';
+}
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-submit');
+  const errEl = document.getElementById('login-error'); errEl.textContent = '';
+  btn.disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { errEl.textContent = error.message; btn.disabled = false; return; }
+  location.href = nextPath();
+}
+document.getElementById('login-submit').addEventListener('click', doLogin);
+document.getElementById('login-password').addEventListener('keydown', e=>{ if (e.key === 'Enter') doLogin(); });
+
+// Already have a valid Supabase session (e.g. came back to login.html by
+// mistake) -- just move on, index.html does its own access check.
+(async ()=>{
+  const { data:{ session } } = await sb.auth.getSession();
+  if (session) location.href = nextPath();
+})();
+</script>
+</body>
+</html>
