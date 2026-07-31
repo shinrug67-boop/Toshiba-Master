@@ -155,3 +155,10 @@ update injuries set squad_player_id = (select id from squad_players where name =
 delete from squad_players where name = 'Y.Kokaji';
 
 update squad_players set name = 'Yuto Mori' where name = 'MORI YUTO';
+
+-- Found on a follow-up looser pass (surname-token overlap) -- these two
+-- didn't match the strict initial+surname / two-word-reorder heuristics
+-- above: "AMUELA" is a typo for "SAMUELA" (missing leading S), and
+-- "Du Toit" is a two-word surname the initial-pattern regex didn't allow.
+update squad_players set name = 'Samuela Anise' where name = 'ANISE AMUELA';
+update squad_players set name = 'Stephanus Du Toit' where name = 'S.Du Toit';
