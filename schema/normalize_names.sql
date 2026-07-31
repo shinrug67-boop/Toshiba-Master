@@ -190,3 +190,15 @@ update squad_players set name = 'Takagi Shoichi' where name = 'TAKAGI SHOICHI';
 update squad_players set name = 'Tim Bateman' where name = 'TIM BATEMAN';
 update squad_players set name = 'Tom Taylor' where name = 'TOM TAYLOR';
 update squad_players set name = 'Yoshida Tomoki' where name = 'YOSHIDA TOMOKI';
+
+-- Reported by the user: 3 more typo/abbreviation variants duplicating
+-- players already renamed above. No squad_players rename needed here (the
+-- canonical row already exists) -- just repoint injuries and drop the dupe.
+update injuries set squad_player_id = (select id from squad_players where name = 'Asaeli Lausii') where squad_player_id = (select id from squad_players where name = 'L.Asaeli');
+delete from squad_players where name = 'L.Asaeli';
+
+update injuries set squad_player_id = (select id from squad_players where name = 'Richie Mo''unga') where squad_player_id = (select id from squad_players where name = 'R.Mounga');
+delete from squad_players where name = 'R.Mounga';
+
+update injuries set squad_player_id = (select id from squad_players where name = 'Michael Collins') where squad_player_id = (select id from squad_players where name = 'M.Colins');
+delete from squad_players where name = 'M.Colins';
