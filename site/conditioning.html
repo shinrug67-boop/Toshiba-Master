@@ -242,20 +242,27 @@ function render(){
   const tbody = document.createElement('tbody');
   rows.forEach((r, i) => {
     const raw = r.raw;
-    const tr = document.createElement('tr');
-    tr.className = 'main-row';
-    tr.style.cursor = 'pointer';
-    tr.innerHTML = `<td>${r.injury_date || '–'}</td><td>${r.season}</td><td>${r.squad_players.name}</td>` +
+    const mainTr = document.createElement('tr');
+    mainTr.className = 'main-row';
+    mainTr.style.cursor = 'pointer';
+    mainTr.innerHTML = `<td>${r.injury_date || '–'}</td><td>${r.season}</td><td>${r.squad_players.name}</td>` +
       `<td>${tr(raw['Part']) || '–'}</td><td>${tr(raw['Injury']) || '–'}</td><td>${situationPill(raw)}</td>` +
       `<td>${raw['To RTP'] != null ? raw['To RTP'] : '–'}</td><td><button class="toggle-btn" type="button">${U().detail_btn}</button></td>`;
     const detailTr = document.createElement('tr');
     detailTr.className = 'detail-row';
     const detailTd = document.createElement('td'); detailTd.colSpan = 8;
-    detailTd.appendChild(buildDetailSections(raw));
     detailTr.appendChild(detailTd);
-    const toggle = () => detailTr.classList.toggle('open');
-    tr.addEventListener('click', toggle);
-    tbody.appendChild(tr); tbody.appendChild(detailTr);
+    // Build the (fairly heavy, grouped/translated) detail panel lazily on
+    // first expand instead of for all ~770 rows up front -- most rows are
+    // never opened, and building all of them eagerly on every render() call
+    // (every filter change, every language toggle) was the main cost.
+    let built = false;
+    const toggle = () => {
+      if (!built){ detailTd.appendChild(buildDetailSections(raw)); built = true; }
+      detailTr.classList.toggle('open');
+    };
+    mainTr.addEventListener('click', toggle);
+    tbody.appendChild(mainTr); tbody.appendChild(detailTr);
   });
   table.appendChild(tbody); scroll.appendChild(table);
   content.replaceChildren(scroll);
