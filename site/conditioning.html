@@ -289,7 +289,13 @@ function setChrome(){
   document.getElementById('page-sub').textContent = U().sub;
   document.getElementById('lbl-season').textContent = U().f_season;
   document.getElementById('lbl-player').textContent = U().f_player;
-  document.getElementById('loading-msg').textContent = U().loading;
+  // loading-msg only exists in the DOM before the first render() replaces
+  // #content's contents -- guard it, or this throws on every later
+  // setChrome() call (e.g. a language switch) and silently aborts the rest
+  // of that function (which is why page-foot and the actual re-render used
+  // to get stuck on the previous language).
+  const loadingMsg = document.getElementById('loading-msg');
+  if (loadingMsg) loadingMsg.textContent = U().loading;
   document.getElementById('page-foot').textContent = U().foot;
 }
 setChrome();
