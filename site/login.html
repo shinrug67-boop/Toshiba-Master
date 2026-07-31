@@ -27,18 +27,44 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 .login-card button:hover { background:#1f63b5; }
 .login-card button:disabled { opacity:.6; cursor:default; }
 .login-card .err { color:#d64545; font-size:12px; margin-top:8px; min-height:1em; }
+#lang-toggle{position:fixed;top:14px;right:14px;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface);
+  border:1px solid var(--border);border-radius:6px;padding:5px 11px;cursor:pointer;}
+#lang-toggle:hover{background:rgba(128,128,128,.1);}
 </style>
 </head>
 <body>
+<button id="lang-toggle" type="button">EN</button>
 <div class="login-card">
   <div class="brand">🏉 Toshiba Master Data</div>
-  <div class="brand-sub">コーチングスタッフ専用</div>
-  <h2>ログイン</h2>
+  <div class="brand-sub" id="brand-sub"></div>
+  <h2 id="login-title"></h2>
   <input id="login-email" type="email" autocomplete="username" placeholder="email@example.com">
   <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
-  <button id="login-submit" type="button">ログイン</button>
+  <button id="login-submit" type="button"></button>
   <div class="err" id="login-error"></div>
 </div>
+<script>
+const UI = {
+  ja: { brand_sub:'コーチングスタッフ専用', title:'ログイン', btn:'ログイン', lang_btn:'EN' },
+  en: { brand_sub:'Coaching staff only', title:'Sign in', btn:'Sign in', lang_btn:'日本語' },
+};
+let LANG = localStorage.getItem('toshibaMasterDataLang') ||
+  ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
+function U(){ return UI[LANG]; }
+function setChrome(){
+  document.documentElement.lang = LANG;
+  document.getElementById('brand-sub').textContent = U().brand_sub;
+  document.getElementById('login-title').textContent = U().title;
+  document.getElementById('login-submit').textContent = U().btn;
+  document.getElementById('lang-toggle').textContent = U().lang_btn;
+}
+setChrome();
+document.getElementById('lang-toggle').addEventListener('click', () => {
+  LANG = LANG === 'ja' ? 'en' : 'ja';
+  localStorage.setItem('toshibaMasterDataLang', LANG);
+  setChrome();
+});
+</script>
 <script>
 // Toshiba Master Data's own Supabase project (separate from the
 // match-stats dashboard's project) -- squad_players/injuries live here,

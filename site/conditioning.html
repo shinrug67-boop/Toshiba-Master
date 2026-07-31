@@ -22,9 +22,9 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 .topnav .navlinks a.active{background:var(--red);color:#fff;}
 .topnav .sub{font-size:12px;color:var(--ink-muted);}
 .topnav .spacer{flex:1;}
-#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+#logout-btn,#lang-toggle{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
   border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
-#logout-btn:hover{background:rgba(255,255,255,.06);}
+#logout-btn:hover,#lang-toggle:hover{background:rgba(255,255,255,.06);}
 .wrap { max-width:1200px; margin:0 auto; padding:18px var(--gap) 40px; }
 header h1 { font-size:20px; font-weight:800; }
 header .sub { font-size:12.5px; color:var(--ink-2); margin-top:2px; }
@@ -63,30 +63,57 @@ footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
 <nav class="topnav">
   <a class="brand" href="index.html">🏉 Toshiba Master Data</a>
   <div class="navlinks">
-    <a href="index.html">ホーム</a>
-    <a href="rugby.html">ラグビー</a>
-    <a href="gym.html">ジム</a>
-    <a href="conditioning.html" class="active">コンディショニング</a>
+    <a href="index.html" id="nav-home"></a>
+    <a href="rugby.html" id="nav-rugby"></a>
+    <a href="gym.html" id="nav-gym"></a>
+    <a href="conditioning.html" class="active" id="nav-conditioning"></a>
   </div>
   <span class="spacer"></span>
-  <button id="logout-btn" type="button">ログアウト</button>
+  <button id="lang-toggle" type="button"></button>
+  <button id="logout-btn" type="button"></button>
 </nav>
 <div class="wrap">
   <header>
-    <h1>ケガ一覧</h1>
-    <div class="sub">Record of past injuries.xlsx「全体」シートを読み込み。行をクリックすると詳細を展開します。</div>
+    <h1 id="page-title"></h1>
+    <div class="sub" id="page-sub"></div>
   </header>
   <div class="filters">
-    <div class="fg"><label for="f-season">シーズン</label><select id="f-season"></select></div>
-    <div class="fg"><label for="f-player">選手</label><select id="f-player"></select></div>
+    <div class="fg"><label for="f-season" id="lbl-season"></label><select id="f-season"></select></div>
+    <div class="fg"><label for="f-player" id="lbl-player"></label><select id="f-player"></select></div>
   </div>
-  <div id="content"><div class="empty">読み込み中...</div></div>
-  <footer>選手数・ケガ件数は Supabase の squad_players / injuries テーブルから取得。</footer>
+  <div id="content"><div class="empty" id="loading-msg"></div></div>
+  <footer id="page-foot"></footer>
 </div>
 <script>
 const SUPABASE_URL = 'https://rfezfalnfnoownxzibna.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1Ri7VHRowpB0dotP1emnBw_jPcJCVN6';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const UI = {
+  ja: { nav_home:'ホーム', nav_rugby:'ラグビー', nav_gym:'ジム', nav_conditioning:'コンディショニング',
+    logout_btn:'ログアウト', lang_btn:'EN',
+    title:'ケガ一覧', sub:'Record of past injuries.xlsx「全体」シートを読み込み。行をクリックすると詳細を展開します。',
+    f_season:'シーズン', f_player:'選手', all_option:'すべて',
+    th_date:'日付', th_season:'シーズン', th_player:'選手', th_part:'部位', th_diag:'診断',
+    th_situation:'状況', th_rtp:'復帰まで(日)', detail_btn:'詳細',
+    loading:'読み込み中...', empty_filtered:'該当するケガ記録がありません',
+    load_error:'データの読み込みに失敗しました',
+    no_access:'表示できるデータがありません。アクセス権限が無いか、まだデータが投入されていない可能性があります。',
+    foot:'選手数・ケガ件数は Supabase の squad_players / injuries テーブルから取得。' },
+  en: { nav_home:'Home', nav_rugby:'Rugby', nav_gym:'Gym', nav_conditioning:'Conditioning',
+    logout_btn:'Sign out', lang_btn:'日本語',
+    title:'Injury List', sub:'Loaded from the "全体" (All) sheet of Record of past injuries.xlsx. Click a row to expand its details.',
+    f_season:'Season', f_player:'Player', all_option:'All',
+    th_date:'Date', th_season:'Season', th_player:'Player', th_part:'Part', th_diag:'Diagnosis',
+    th_situation:'Situation', th_rtp:'Days to RTP', detail_btn:'Details',
+    loading:'Loading...', empty_filtered:'No matching injury records',
+    load_error:'Failed to load data',
+    no_access:'No data to display. You may not have access, or data may not be loaded yet.',
+    foot:'Player and injury counts come from the squad_players / injuries tables in Supabase.' },
+};
+let LANG = localStorage.getItem('toshibaMasterDataLang') ||
+  ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
+function U(){ return UI[LANG]; }
 
 async function fetchAll(table, columns){
   let out = [], from = 0; const pageSize = 1000;
@@ -105,13 +132,17 @@ let INJURIES = [];
 function fillFilters(){
   const seasons = [...new Set(INJURIES.map(r => r.season))].sort().reverse();
   const sSel = document.getElementById('f-season');
-  sSel.replaceChildren(new Option('すべて', 'all'));
+  const prevSeason = sSel.value;
+  sSel.replaceChildren(new Option(U().all_option, 'all'));
   seasons.forEach(s => sSel.appendChild(new Option(s, s)));
+  if ([...sSel.options].some(o => o.value === prevSeason)) sSel.value = prevSeason;
 
   const players = [...new Set(INJURIES.map(r => r.squad_players.name))].sort();
   const pSel = document.getElementById('f-player');
-  pSel.replaceChildren(new Option('すべて', 'all'));
+  const prevPlayer = pSel.value;
+  pSel.replaceChildren(new Option(U().all_option, 'all'));
   players.forEach(p => pSel.appendChild(new Option(p, p)));
+  if ([...pSel.options].some(o => o.value === prevPlayer)) pSel.value = prevPlayer;
 }
 
 function filtered(){
@@ -130,28 +161,45 @@ function situationPill(raw){
   return `<span class="pill ${cls}">${s}</span>`;
 }
 
-// Groups + Japanese labels for the raw Excel columns, so the detail panel
-// reads as labeled sections instead of one long undifferentiated grid of
-// 20-30 same-size key/value pairs (which is what made it hard to scan).
-const DETAIL_SECTIONS = [
-  { title: '基本情報', fields: {
-    'R/L': '左右', 'Part': '部位', 'Part Other': '部位(その他)', 'Type': '種別', 'Injury': '診断',
-    'Session': 'セッション', 'Att/Def': '攻撃/守備', 'Event': 'イベント',
-    'Situation': '状況', 'Other': 'その他' } },
-  { title: '受診・処置', fields: {
-    'Consultation': '受診', 'Consultation Day': '受診日', 'Hospital': '病院', 'Dr.1': '医師1',
-    'Image': '画像診断', 'HBO': '高気圧酸素療法', 'Ope.': '手術', 'Surgery Day': '手術日',
-    'Hospital2': '病院2', 'Dr.2': '医師2', 'Ad': '入院日', 'Ent': '退院日',
-    'Hospitalization': '入院期間' } },
-  { title: '復帰', fields: {
-    'Start Jog': 'ジョグ開始', 'Start Splint': '装具開始', 'Return Date': '復帰日',
-    'To RTP': '復帰まで(日)' } },
-  { title: 'メモ', fields: { 'Memo': 'メモ' } },
-];
+// Groups + labels for the raw Excel columns, so the detail panel reads as
+// labeled sections instead of one long undifferentiated grid of 20-30
+// same-size key/value pairs (which is what made it hard to scan).
+const DETAIL_SECTIONS = {
+  ja: [
+    { title: '基本情報', fields: {
+      'R/L': '左右', 'Part': '部位', 'Part Other': '部位(その他)', 'Type': '種別', 'Injury': '診断',
+      'Session': 'セッション', 'Att/Def': '攻撃/守備', 'Event': 'イベント',
+      'Situation': '状況', 'Other': 'その他' } },
+    { title: '受診・処置', fields: {
+      'Consultation': '受診', 'Consultation Day': '受診日', 'Hospital': '病院', 'Dr.1': '医師1',
+      'Image': '画像診断', 'HBO': '高気圧酸素療法', 'Ope.': '手術', 'Surgery Day': '手術日',
+      'Hospital2': '病院2', 'Dr.2': '医師2', 'Ad': '入院日', 'Ent': '退院日',
+      'Hospitalization': '入院期間' } },
+    { title: '復帰', fields: {
+      'Start Jog': 'ジョグ開始', 'Start Splint': '装具開始', 'Return Date': '復帰日',
+      'To RTP': '復帰まで(日)' } },
+    { title: 'メモ', fields: { 'Memo': 'メモ' } },
+  ],
+  en: [
+    { title: 'Basic Info', fields: {
+      'R/L': 'Side', 'Part': 'Part', 'Part Other': 'Part (Other)', 'Type': 'Type', 'Injury': 'Diagnosis',
+      'Session': 'Session', 'Att/Def': 'Attack/Defense', 'Event': 'Event',
+      'Situation': 'Situation', 'Other': 'Other' } },
+    { title: 'Consultation & Treatment', fields: {
+      'Consultation': 'Consultation', 'Consultation Day': 'Consultation Date', 'Hospital': 'Hospital', 'Dr.1': 'Doctor 1',
+      'Image': 'Imaging', 'HBO': 'HBO Therapy', 'Ope.': 'Surgery', 'Surgery Day': 'Surgery Date',
+      'Hospital2': 'Hospital 2', 'Dr.2': 'Doctor 2', 'Ad': 'Admission Date', 'Ent': 'Discharge Date',
+      'Hospitalization': 'Hospitalization' } },
+    { title: 'Return to Play', fields: {
+      'Start Jog': 'Start Jog', 'Start Splint': 'Start Splint', 'Return Date': 'Return Date',
+      'To RTP': 'Days to RTP' } },
+    { title: 'Memo', fields: { 'Memo': 'Memo' } },
+  ],
+};
 
 function buildDetailSections(raw){
   const container = document.createElement('div');
-  DETAIL_SECTIONS.forEach(({ title, fields }) => {
+  DETAIL_SECTIONS[LANG].forEach(({ title, fields }) => {
     const entries = Object.entries(fields).filter(([k]) => raw[k] != null && raw[k] !== '');
     if (!entries.length) return;
     const section = document.createElement('div'); section.className = 'detail-section';
@@ -173,12 +221,13 @@ function render(){
   const rows = filtered();
   const content = document.getElementById('content');
   if (!rows.length){
-    content.innerHTML = '<div class="empty">該当するケガ記録がありません</div>';
+    content.innerHTML = `<div class="empty">${U().empty_filtered}</div>`;
     return;
   }
   const scroll = document.createElement('div'); scroll.className = 'tbl-scroll';
   const table = document.createElement('table');
-  table.innerHTML = '<thead><tr><th>日付</th><th>シーズン</th><th>選手</th><th>部位</th><th>診断</th><th>状況</th><th>復帰まで(日)</th><th></th></tr></thead>';
+  table.innerHTML = `<thead><tr><th>${U().th_date}</th><th>${U().th_season}</th><th>${U().th_player}</th>` +
+    `<th>${U().th_part}</th><th>${U().th_diag}</th><th>${U().th_situation}</th><th>${U().th_rtp}</th><th></th></tr></thead>`;
   const tbody = document.createElement('tbody');
   rows.forEach((r, i) => {
     const raw = r.raw;
@@ -187,7 +236,7 @@ function render(){
     tr.style.cursor = 'pointer';
     tr.innerHTML = `<td>${r.injury_date || '–'}</td><td>${r.season}</td><td>${r.squad_players.name}</td>` +
       `<td>${raw['Part'] || '–'}</td><td>${raw['Injury'] || '–'}</td><td>${situationPill(raw)}</td>` +
-      `<td>${raw['To RTP'] != null ? raw['To RTP'] : '–'}</td><td><button class="toggle-btn" type="button">詳細</button></td>`;
+      `<td>${raw['To RTP'] != null ? raw['To RTP'] : '–'}</td><td><button class="toggle-btn" type="button">${U().detail_btn}</button></td>`;
     const detailTr = document.createElement('tr');
     detailTr.className = 'detail-row';
     const detailTd = document.createElement('td'); detailTd.colSpan = 8;
@@ -201,6 +250,24 @@ function render(){
   content.replaceChildren(scroll);
 }
 
+function setChrome(){
+  document.documentElement.lang = LANG;
+  document.title = U().title + ' — Toshiba Master Data';
+  document.getElementById('nav-home').textContent = U().nav_home;
+  document.getElementById('nav-rugby').textContent = U().nav_rugby;
+  document.getElementById('nav-gym').textContent = U().nav_gym;
+  document.getElementById('nav-conditioning').textContent = U().nav_conditioning;
+  document.getElementById('logout-btn').textContent = U().logout_btn;
+  document.getElementById('lang-toggle').textContent = U().lang_btn;
+  document.getElementById('page-title').textContent = U().title;
+  document.getElementById('page-sub').textContent = U().sub;
+  document.getElementById('lbl-season').textContent = U().f_season;
+  document.getElementById('lbl-player').textContent = U().f_player;
+  document.getElementById('loading-msg').textContent = U().loading;
+  document.getElementById('page-foot').textContent = U().foot;
+}
+setChrome();
+
 async function doLogout(){
   await sb.auth.signOut();
   location.href = 'login.html';
@@ -208,6 +275,12 @@ async function doLogout(){
 document.getElementById('logout-btn').addEventListener('click', doLogout);
 document.getElementById('f-season').addEventListener('change', render);
 document.getElementById('f-player').addEventListener('change', render);
+document.getElementById('lang-toggle').addEventListener('click', () => {
+  LANG = LANG === 'ja' ? 'en' : 'ja';
+  localStorage.setItem('toshibaMasterDataLang', LANG);
+  setChrome();
+  if (INJURIES.length){ fillFilters(); render(); }
+});
 
 async function init(){
   const { data: { session } } = await sb.auth.getSession();
@@ -223,13 +296,12 @@ async function init(){
     // an empty result set back here, which we treat as "no access".
     INJURIES = await fetchAll('injuries', 'id, season, injury_date, raw, squad_players(name)');
   } catch (e) {
-    document.getElementById('content').innerHTML = '<div class="empty">データの読み込みに失敗しました</div>';
+    document.getElementById('content').innerHTML = `<div class="empty">${U().load_error}</div>`;
     console.error(e);
     return;
   }
   if (!INJURIES.length){
-    document.getElementById('content').innerHTML =
-      '<div class="empty">表示できるデータがありません。アクセス権限が無いか、まだデータが投入されていない可能性があります。</div>';
+    document.getElementById('content').innerHTML = `<div class="empty">${U().no_access}</div>`;
     return;
   }
   fillFilters();

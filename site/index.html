@@ -20,9 +20,9 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 .topnav .navlinks a:hover{background:rgba(255,255,255,.06);}
 .topnav .navlinks a.active{background:var(--red);color:#fff;}
 .topnav .spacer{flex:1;}
-#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+#logout-btn,#lang-toggle{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
   border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
-#logout-btn:hover{background:rgba(255,255,255,.06);}
+#logout-btn:hover,#lang-toggle:hover{background:rgba(255,255,255,.06);}
 .wrap { max-width:900px; margin:0 auto; padding:40px var(--gap) 40px; }
 header h1 { font-size:26px; font-weight:800; }
 header .sub { font-size:13px; color:var(--ink-2); margin-top:4px; }
@@ -39,34 +39,35 @@ header .sub { font-size:13px; color:var(--ink-2); margin-top:4px; }
 <nav class="topnav">
   <a class="brand" href="index.html">🏉 Toshiba Master Data</a>
   <div class="navlinks">
-    <a href="index.html" class="active">ホーム</a>
-    <a href="rugby.html">ラグビー</a>
-    <a href="gym.html">ジム</a>
-    <a href="conditioning.html">コンディショニング</a>
+    <a href="index.html" class="active" id="nav-home"></a>
+    <a href="rugby.html" id="nav-rugby"></a>
+    <a href="gym.html" id="nav-gym"></a>
+    <a href="conditioning.html" id="nav-conditioning"></a>
   </div>
   <span class="spacer"></span>
-  <button id="logout-btn" type="button">ログアウト</button>
+  <button id="lang-toggle" type="button"></button>
+  <button id="logout-btn" type="button"></button>
 </nav>
 <div class="wrap">
   <header>
     <h1>Toshiba Master Data</h1>
-    <div class="sub">Toshiba Brave Lupus Tokyo — ラグビー・ジム・コンディショニングを1つに統合</div>
+    <div class="sub" id="page-sub"></div>
   </header>
   <div class="cards">
     <a class="card" href="rugby.html">
       <div class="icon">🏉</div>
-      <div class="title">ラグビー</div>
-      <div class="desc">選手個人のAttack / Defense / Kicking / Scrum / Lineoutスタッツ</div>
+      <div class="title" id="card-rugby-title"></div>
+      <div class="desc" id="card-rugby-desc"></div>
     </a>
     <a class="card" href="gym.html">
       <div class="icon">🏋️</div>
-      <div class="title">ジム</div>
-      <div class="desc">測定・トレーニングデータ(準備中)</div>
+      <div class="title" id="card-gym-title"></div>
+      <div class="desc" id="card-gym-desc"></div>
     </a>
     <a class="card" href="conditioning.html">
       <div class="icon">🩹</div>
-      <div class="title">コンディショニング</div>
-      <div class="desc">ケガの発生履歴・復帰状況</div>
+      <div class="title" id="card-cond-title"></div>
+      <div class="desc" id="card-cond-desc"></div>
     </a>
   </div>
 </div>
@@ -74,6 +75,46 @@ header .sub { font-size:13px; color:var(--ink-2); margin-top:4px; }
 const SUPABASE_URL = 'https://rfezfalnfnoownxzibna.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1Ri7VHRowpB0dotP1emnBw_jPcJCVN6';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const UI = {
+  ja: { nav_home:'ホーム', nav_rugby:'ラグビー', nav_gym:'ジム', nav_conditioning:'コンディショニング',
+    logout_btn:'ログアウト', lang_btn:'EN',
+    page_sub:'Toshiba Brave Lupus Tokyo — ラグビー・ジム・コンディショニングを1つに統合',
+    rugby_title:'ラグビー', rugby_desc:'選手個人のAttack / Defense / Kicking / Scrum / Lineoutスタッツ',
+    gym_title:'ジム', gym_desc:'測定・トレーニングデータ(準備中)',
+    cond_title:'コンディショニング', cond_desc:'ケガの発生履歴・復帰状況' },
+  en: { nav_home:'Home', nav_rugby:'Rugby', nav_gym:'Gym', nav_conditioning:'Conditioning',
+    logout_btn:'Sign out', lang_btn:'日本語',
+    page_sub:'Toshiba Brave Lupus Tokyo — Rugby, gym, and conditioning in one place',
+    rugby_title:'Rugby', rugby_desc:'Individual player Attack / Defense / Kicking / Scrum / Lineout stats',
+    gym_title:'Gym', gym_desc:'Measurement & training data (coming soon)',
+    cond_title:'Conditioning', cond_desc:'Injury history and return-to-play status' },
+};
+let LANG = localStorage.getItem('toshibaMasterDataLang') ||
+  ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
+function U(){ return UI[LANG]; }
+function setChrome(){
+  document.documentElement.lang = LANG;
+  document.getElementById('nav-home').textContent = U().nav_home;
+  document.getElementById('nav-rugby').textContent = U().nav_rugby;
+  document.getElementById('nav-gym').textContent = U().nav_gym;
+  document.getElementById('nav-conditioning').textContent = U().nav_conditioning;
+  document.getElementById('logout-btn').textContent = U().logout_btn;
+  document.getElementById('lang-toggle').textContent = U().lang_btn;
+  document.getElementById('page-sub').textContent = U().page_sub;
+  document.getElementById('card-rugby-title').textContent = U().rugby_title;
+  document.getElementById('card-rugby-desc').textContent = U().rugby_desc;
+  document.getElementById('card-gym-title').textContent = U().gym_title;
+  document.getElementById('card-gym-desc').textContent = U().gym_desc;
+  document.getElementById('card-cond-title').textContent = U().cond_title;
+  document.getElementById('card-cond-desc').textContent = U().cond_desc;
+}
+setChrome();
+document.getElementById('lang-toggle').addEventListener('click', () => {
+  LANG = LANG === 'ja' ? 'en' : 'ja';
+  localStorage.setItem('toshibaMasterDataLang', LANG);
+  setChrome();
+});
 
 async function doLogout(){
   await sb.auth.signOut();

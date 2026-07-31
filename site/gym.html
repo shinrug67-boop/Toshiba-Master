@@ -20,9 +20,9 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 .topnav .navlinks a:hover{background:rgba(255,255,255,.06);}
 .topnav .navlinks a.active{background:var(--red);color:#fff;}
 .topnav .spacer{flex:1;}
-#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+#logout-btn,#lang-toggle{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
   border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
-#logout-btn:hover{background:rgba(255,255,255,.06);}
+#logout-btn:hover,#lang-toggle:hover{background:rgba(255,255,255,.06);}
 .wrap { max-width:900px; margin:0 auto; padding:18px var(--gap) 40px; }
 header h1 { font-size:20px; font-weight:800; }
 header .sub { font-size:12.5px; color:var(--ink-2); margin-top:2px; }
@@ -33,25 +33,58 @@ header .sub { font-size:12.5px; color:var(--ink-2); margin-top:2px; }
 <nav class="topnav">
   <a class="brand" href="index.html">🏉 Toshiba Master Data</a>
   <div class="navlinks">
-    <a href="index.html">ホーム</a>
-    <a href="rugby.html">ラグビー</a>
-    <a href="gym.html" class="active">ジム</a>
-    <a href="conditioning.html">コンディショニング</a>
+    <a href="index.html" id="nav-home"></a>
+    <a href="rugby.html" id="nav-rugby"></a>
+    <a href="gym.html" class="active" id="nav-gym"></a>
+    <a href="conditioning.html" id="nav-conditioning"></a>
   </div>
   <span class="spacer"></span>
-  <button id="logout-btn" type="button">ログアウト</button>
+  <button id="lang-toggle" type="button"></button>
+  <button id="logout-btn" type="button"></button>
 </nav>
 <div class="wrap">
   <header>
-    <h1>ジム</h1>
-    <div class="sub">測定・トレーニングデータ</div>
+    <h1 id="page-title"></h1>
+    <div class="sub" id="page-sub"></div>
   </header>
-  <div class="empty">準備中です。データ形式が決まり次第、ここに測定結果(ベンチプレス・スクワット・スプリント等)を表示します。</div>
+  <div class="empty" id="page-empty"></div>
 </div>
 <script>
 const SUPABASE_URL = 'https://rfezfalnfnoownxzibna.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1Ri7VHRowpB0dotP1emnBw_jPcJCVN6';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const UI = {
+  ja: { nav_home:'ホーム', nav_rugby:'ラグビー', nav_gym:'ジム', nav_conditioning:'コンディショニング',
+    logout_btn:'ログアウト', lang_btn:'EN',
+    title:'ジム', sub:'測定・トレーニングデータ',
+    empty:'準備中です。データ形式が決まり次第、ここに測定結果(ベンチプレス・スクワット・スプリント等)を表示します。' },
+  en: { nav_home:'Home', nav_rugby:'Rugby', nav_gym:'Gym', nav_conditioning:'Conditioning',
+    logout_btn:'Sign out', lang_btn:'日本語',
+    title:'Gym', sub:'Measurement & training data',
+    empty:'Coming soon. Once the data format is decided, measurement results (bench press, squat, sprint times, etc.) will show up here.' },
+};
+let LANG = localStorage.getItem('toshibaMasterDataLang') ||
+  ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
+function U(){ return UI[LANG]; }
+function setChrome(){
+  document.documentElement.lang = LANG;
+  document.getElementById('nav-home').textContent = U().nav_home;
+  document.getElementById('nav-rugby').textContent = U().nav_rugby;
+  document.getElementById('nav-gym').textContent = U().nav_gym;
+  document.getElementById('nav-conditioning').textContent = U().nav_conditioning;
+  document.getElementById('logout-btn').textContent = U().logout_btn;
+  document.getElementById('lang-toggle').textContent = U().lang_btn;
+  document.getElementById('page-title').textContent = U().title;
+  document.getElementById('page-sub').textContent = U().sub;
+  document.getElementById('page-empty').textContent = U().empty;
+}
+setChrome();
+document.getElementById('lang-toggle').addEventListener('click', () => {
+  LANG = LANG === 'ja' ? 'en' : 'ja';
+  localStorage.setItem('toshibaMasterDataLang', LANG);
+  setChrome();
+});
 
 async function doLogout(){
   await sb.auth.signOut();

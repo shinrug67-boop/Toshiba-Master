@@ -21,9 +21,9 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 .topnav .navlinks a:hover{background:rgba(255,255,255,.06);}
 .topnav .navlinks a.active{background:var(--red);color:#fff;}
 .topnav .spacer{flex:1;}
-#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+#logout-btn,#lang-toggle{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
   border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
-#logout-btn:hover{background:rgba(255,255,255,.06);}
+#logout-btn:hover,#lang-toggle:hover{background:rgba(255,255,255,.06);}
 .wrap { max-width:900px; margin:0 auto; padding:18px var(--gap) 40px; }
 header h1 { font-size:20px; font-weight:800; }
 header .sub { font-size:12.5px; color:var(--ink-2); margin-top:2px; }
@@ -58,32 +58,26 @@ footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
 <nav class="topnav">
   <a class="brand" href="index.html">🏉 Toshiba Master Data</a>
   <div class="navlinks">
-    <a href="index.html">ホーム</a>
-    <a href="rugby.html" class="active">ラグビー</a>
-    <a href="gym.html">ジム</a>
-    <a href="conditioning.html">コンディショニング</a>
+    <a href="index.html" id="nav-home"></a>
+    <a href="rugby.html" class="active" id="nav-rugby"></a>
+    <a href="gym.html" id="nav-gym"></a>
+    <a href="conditioning.html" id="nav-conditioning"></a>
   </div>
   <span class="spacer"></span>
-  <button id="logout-btn" type="button">ログアウト</button>
+  <button id="lang-toggle" type="button"></button>
+  <button id="logout-btn" type="button"></button>
 </nav>
 <div class="wrap">
   <header>
-    <h1>ラグビー個人スタッツ</h1>
-    <div class="sub">Toshiba Brave Lupus Tokyo — Attack / Defense / Kicking / Scrum / Lineout(データ: Opta Stats Perform)</div>
+    <h1 id="page-title"></h1>
+    <div class="sub" id="page-sub"></div>
   </header>
   <div class="filters">
-    <div class="fg"><label for="f-season">シーズン</label><select id="f-season"></select></div>
-    <div class="fg"><label for="f-player">選手</label><select id="f-player"></select></div>
+    <div class="fg"><label for="f-season" id="lbl-season"></label><select id="f-season"></select></div>
+    <div class="fg"><label for="f-player" id="lbl-player"></label><select id="f-player"></select></div>
   </div>
-  <div id="content"><div class="empty">読み込み中...</div></div>
-  <footer>定義: キャリーゲインm=Distance+ / ポストコンタクトm=Metres3合計 / DF Beaten=Attacking Qualities×Defender Beaten /
-    オフロード=Pass×Offload(結果Own Player/To Ground/To Opposition)、成功=Own Player /
-    タックル成功率=(成功各種+Offload Allowed/Pen Conceded)÷タックル(Missed/Ineffective除外) /
-    ジャッカル=Collection×Jackal、成功=Success / OOA=Ruck OOAのqualifier4(Attacking/Defensive OOA) /
-    キックメーター=Kick in Play区間のDistance+合計 / ラインアウトスロー成功率=個人のWon÷総投球(HOのみ表示) /
-    ラインアウト成功率(捕球)=個人の自チーム投球Won÷総捕球、DFスティール=Lineout TakeのSteal系(LO/FL/No8のみ表示) /
-    アタックスクラム成功率=Offensive Scrum個人参加行のWon系÷総参加数 / ディフェンススクラム成功率=Defensive Scrum個人参加行のうち反則を与えなかった割合。
-    ポジションは選手の生涯最頻出ポジション。データ: Opta(Stats Perform, Level 2 Restricted)。このページはログインしたコーチングスタッフのみ閲覧できます。</footer>
+  <div id="content"><div class="empty" id="loading-msg"></div></div>
+  <footer id="page-foot"></footer>
 </div>
 <script>
 const SUPABASE_URL = 'https://rfezfalnfnoownxzibna.supabase.co';
@@ -98,6 +92,71 @@ const PM = RAW.pmet;
 const pIdx = {}; PM.forEach((m,i)=>pIdx[m]=3+i); // P row: [season, playerIdx, gp, ...pmet]
 const HO_POS = new Set(['Hooker']);
 const LO_POS = new Set(['Lock (4)','Lock (5)','Openside Flanker','Blindside Flanker','Number 8']);
+
+const UI = {
+  ja: { nav_home:'ホーム', nav_rugby:'ラグビー', nav_gym:'ジム', nav_conditioning:'コンディショニング',
+    logout_btn:'ログアウト', lang_btn:'EN',
+    title:'ラグビー個人スタッツ',
+    sub:'Toshiba Brave Lupus Tokyo — Attack / Defense / Kicking / Scrum / Lineout(データ: Opta Stats Perform)',
+    f_season:'シーズン', f_player:'選手', all_option:'すべて',
+    loading:'読み込み中...', no_data:'表示できるデータがありません',
+    sec_time:'プレータイム(シーズン別、フィルタ非依存)', sec_attack:'アタック', sec_defense:'ディフェンス',
+    sec_breakdown:'ブレイクダウン関与(Ruck OOA)', sec_kick:'キック', sec_other:'その他',
+    sec_fw:'フォワード専門スタッツ', sec_scrum:'スクラム',
+    pt_col_season:'シーズン', pt_col_min:'プレー時間(分)', pt_col_gp:'出場試合数', pt_col_avgmin:'平均プレー時間(分)',
+    m_carries:'キャリー', m_carrym:'キャリーゲインm', m_post:'ポストコンタクトm', m_beaten:'DF Beaten',
+    m_offload:'オフロード', m_offload_pct:'オフロード成功率', m_linebreak:'ラインブレイク', m_passes:'パス',
+    m_tackles:'タックル', m_tackle_pct:'タックル成功率', m_jackal:'ジャッカル', m_jackal_pct:'ジャッカル成功率',
+    m_atk_ooa:'アタックOOA', m_def_ooa:'ディフェンスOOA',
+    m_kicks:'キック数', m_kickmtr:'キックメーター', m_apm:'Action/Min',
+    kick_retained:'再獲得', kick_pressure:'相手エラー誘発', kick_notsecured:'確保失敗',
+    kick_lost:'相手確保', kick_touch:'タッチ', kick_error:'エラー',
+    ho_throw:'ラインアウトスロー成功率', ho_throw_n:'スロー数',
+    lo_catch:'ラインアウト成功率(捕球)', lo_catch_n:'ATキャッチ数', lo_steal:'DFラインアウトスティール数',
+    off_scrum_pct:'アタックスクラム成功率', def_scrum_pressure:'ディフェンススクラムPressure%', def_scrum_success:'ディフェンススクラム成功率',
+    note_total:(tot)=>`合計 ${tot}`, note_pct:(n,d)=>`${n} / ${d}`,
+    foot:'定義: キャリーゲインm=Distance+ / ポストコンタクトm=Metres3合計 / DF Beaten=Attacking Qualities×Defender Beaten /'
+      + ' オフロード=Pass×Offload(結果Own Player/To Ground/To Opposition)、成功=Own Player /'
+      + ' タックル成功率=(成功各種+Offload Allowed/Pen Conceded)÷タックル(Missed/Ineffective除外) /'
+      + ' ジャッカル=Collection×Jackal、成功=Success / OOA=Ruck OOAのqualifier4(Attacking/Defensive OOA) /'
+      + ' キックメーター=Kick in Play区間のDistance+合計 / ラインアウトスロー成功率=個人のWon÷総投球(HOのみ表示) /'
+      + ' ラインアウト成功率(捕球)=個人の自チーム投球Won÷総捕球、DFスティール=Lineout TakeのSteal系(LO/FL/No8のみ表示) /'
+      + ' アタックスクラム成功率=Offensive Scrum個人参加行のWon系÷総参加数 / ディフェンススクラム成功率=Defensive Scrum個人参加行のうち反則を与えなかった割合。'
+      + ' ポジションは選手の生涯最頻出ポジション。データ: Opta(Stats Perform, Level 2 Restricted)。このページはログインしたコーチングスタッフのみ閲覧できます。' },
+  en: { nav_home:'Home', nav_rugby:'Rugby', nav_gym:'Gym', nav_conditioning:'Conditioning',
+    logout_btn:'Sign out', lang_btn:'日本語',
+    title:'Rugby Player Stats',
+    sub:'Toshiba Brave Lupus Tokyo — Attack / Defense / Kicking / Scrum / Lineout (Data: Opta Stats Perform)',
+    f_season:'Season', f_player:'Player', all_option:'All',
+    loading:'Loading...', no_data:'No data to display',
+    sec_time:'Playing Time (by season, ignores filters above)', sec_attack:'Attack', sec_defense:'Defense',
+    sec_breakdown:'Breakdown Involvement (Ruck OOA)', sec_kick:'Kicking', sec_other:'Other',
+    sec_fw:'Forward-Specific Stats', sec_scrum:'Scrum',
+    pt_col_season:'Season', pt_col_min:'Minutes', pt_col_gp:'Games', pt_col_avgmin:'Avg min/match',
+    m_carries:'Carries', m_carrym:'Carry metres', m_post:'Post-contact m', m_beaten:'DF Beaten',
+    m_offload:'Offloads', m_offload_pct:'Offload success%', m_linebreak:'Line breaks', m_passes:'Passes',
+    m_tackles:'Tackles', m_tackle_pct:'Tackle success%', m_jackal:'Jackal', m_jackal_pct:'Jackal success%',
+    m_atk_ooa:'Attack OOA', m_def_ooa:'Defense OOA',
+    m_kicks:'Kicks', m_kickmtr:'Kick metres', m_apm:'Action/Min',
+    kick_retained:'Regained', kick_pressure:'Forced error', kick_notsecured:'Fail to secure',
+    kick_lost:'Opp. secured', kick_touch:'Touch', kick_error:'Error',
+    ho_throw:'Lineout throw success%', ho_throw_n:'Throws',
+    lo_catch:'Lineout success% (catch)', lo_catch_n:'AT catches', lo_steal:'DF lineout steals',
+    off_scrum_pct:'Attack scrum success%', def_scrum_pressure:'Defense scrum pressure%', def_scrum_success:'Defense scrum success%',
+    note_total:(tot)=>`Total ${tot}`, note_pct:(n,d)=>`${n} / ${d}`,
+    foot:'Definitions: Carry metres=Distance+ / Post-contact m=sum of Metres3 / DF Beaten=Attacking Qualities×Defender Beaten /'
+      + ' Offload=Pass×Offload (result Own Player/To Ground/To Opposition), success=Own Player /'
+      + ' Tackle success=(success variants+Offload Allowed/Pen Conceded)÷tackles (Missed/Ineffective excluded) /'
+      + ' Jackal=Collection×Jackal, success=Success / OOA=Ruck OOA qualifier4 (Attacking/Defensive OOA) /'
+      + ' Kick metres=Distance+ summed over Kick in Play qualifiers / Lineout throw success=individual\'s own Won÷own throws (Hookers only) /'
+      + ' Lineout success (catch)=individual\'s own-throw Won÷own catches, DF steal=Lineout Take Steal variants (Locks/Flankers/No.8 only) /'
+      + ' Attack scrum success%=Offensive Scrum individual participation rows with Won variants÷total participations /'
+      + ' Defense scrum success%=Defensive Scrum individual participation rows without a penalty conceded.'
+      + ' Position = the player\'s career-long most frequent position. Data: Opta (Stats Perform, Level 2 Restricted). This page is only visible to signed-in coaching staff.' },
+};
+let LANG = localStorage.getItem('toshibaMasterDataLang') ||
+  ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
+function U(){ return UI[LANG]; }
 
 function seasonLabel(y){ return `${y}-${String(y+1).slice(2)}`; }
 function pct(n,d){ return d ? (n/d*100) : 0; }
@@ -130,19 +189,18 @@ function statRow(card, label, val, digits, note){
 }
 function totalAvgRow(card, label, c, key, digits){
   const tot = c[key], avg = c.__m ? tot/c.__m : 0;
-  statRow(card, label, avg, 1, `合計 ${fmt(tot,digits)}`);
+  statRow(card, label, avg, 1, U().note_total(fmt(tot,digits)));
 }
 function pctRow(card, label, c, numKey, denKey){
-  statRow(card, label, pct(c[numKey], c[denKey]), 1, `${c[numKey]} / ${c[denKey]}`);
+  statRow(card, label, pct(c[numKey], c[denKey]), 1, U().note_pct(c[numKey], c[denKey]));
 }
 function kickMix(card, c){
-  const keys = {kick_retained:'再獲得', kick_pressure:'相手エラー誘発', kick_notsecured:'確保失敗',
-    kick_lost:'相手確保', kick_touch:'タッチ', kick_error:'エラー'};
+  const keys = ['kick_retained','kick_pressure','kick_notsecured','kick_lost','kick_touch','kick_error'];
   const mix = document.createElement('div'); mix.className='kick-mix';
-  Object.entries(keys).forEach(([k,label])=>{
+  keys.forEach(k=>{
     const p = pct(c[k], c.kicks);
     const el = document.createElement('div');
-    el.textContent = `${label}: ${c[k]} (${p.toFixed(0)}%)`;
+    el.textContent = `${U()[k]}: ${c[k]} (${p.toFixed(0)}%)`;
     mix.appendChild(el);
   });
   card.appendChild(mix);
@@ -151,7 +209,7 @@ function playtimeTable(playerIdx){
   const rows = rowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0]);
   const wrap = document.createElement('div');
   const table = document.createElement('table');
-  table.innerHTML = '<thead><tr><th>シーズン</th><th>プレー時間(分)</th><th>出場試合数</th><th>平均プレー時間(分)</th></tr></thead>';
+  table.innerHTML = `<thead><tr><th>${U().pt_col_season}</th><th>${U().pt_col_min}</th><th>${U().pt_col_gp}</th><th>${U().pt_col_avgmin}</th></tr></thead>`;
   const tbody = document.createElement('tbody');
   rows.forEach(r=>{
     const gp = r[2], mins = r[pIdx.playtime];
@@ -164,26 +222,26 @@ function playtimeTable(playerIdx){
 }
 function fwBlock(container, pos, c){
   if (HO_POS.has(pos)){
-    const card = section(container, 'フォワード専門スタッツ — Hooker');
+    const card = section(container, U().sec_fw + ' — Hooker');
     const p = c.lo_throw_total ? pct(c.lo_throw_won, c.lo_throw_total) : null;
-    statRow(card, 'ラインアウトスロー成功率', p, 1, `スロー数: ${c.lo_throw_total}`);
+    statRow(card, U().ho_throw, p, 1, `${U().ho_throw_n}: ${c.lo_throw_total}`);
   }
   if (LO_POS.has(pos)){
-    const card = section(container, 'フォワード専門スタッツ — ' + pos);
+    const card = section(container, U().sec_fw + ' — ' + pos);
     const catchP = c.lo_catch_total ? pct(c.lo_catch_won, c.lo_catch_total) : null;
-    statRow(card, 'ラインアウト成功率(捕球)', catchP, 1, `ATキャッチ数: ${c.lo_catch_total}`);
-    statRow(card, 'DFラインアウトスティール数', c.lo_steal, 0, c.__m ? (c.lo_steal/c.__m).toFixed(1)+'/match' : '');
+    statRow(card, U().lo_catch, catchP, 1, `${U().lo_catch_n}: ${c.lo_catch_total}`);
+    statRow(card, U().lo_steal, c.lo_steal, 0, c.__m ? (c.lo_steal/c.__m).toFixed(1)+'/match' : '');
   }
 }
 function scrumBlock(container, c){
   const hasOff = c.off_scrum_total > 0, hasDef = c.def_scrum_total > 0;
   if (!hasOff && !hasDef) return;
-  const card = section(container, 'スクラム');
-  if (hasOff) pctRow(card, 'アタックスクラム成功率', c, 'off_scrum_success', 'off_scrum_total');
+  const card = section(container, U().sec_scrum);
+  if (hasOff) pctRow(card, U().off_scrum_pct, c, 'off_scrum_success', 'off_scrum_total');
   if (hasDef){
-    statRow(card, 'ディフェンススクラムPressure%', c.def_scrum_total ? pct(c.def_scrum_pressure, c.def_scrum_total) : null, 1,
+    statRow(card, U().def_scrum_pressure, c.def_scrum_total ? pct(c.def_scrum_pressure, c.def_scrum_total) : null, 1,
       `${c.def_scrum_pressure} / ${c.def_scrum_total}`);
-    statRow(card, 'ディフェンススクラム成功率', c.def_scrum_total ? pct(c.def_scrum_success, c.def_scrum_total) : null, 1,
+    statRow(card, U().def_scrum_success, c.def_scrum_total ? pct(c.def_scrum_success, c.def_scrum_total) : null, 1,
       `${c.def_scrum_success} / ${c.def_scrum_total}`);
   }
 }
@@ -191,19 +249,24 @@ function scrumBlock(container, c){
 function fillFilters(){
   const seasons = [...new Set(RAW.P.map(r=>r[0]))].sort((a,b)=>b-a);
   const sSel = document.getElementById('f-season');
-  sSel.replaceChildren(new Option('すべて', 'all'));
+  const prevSeason = sSel.value;
+  sSel.replaceChildren(new Option(U().all_option, 'all'));
   seasons.forEach(y => sSel.appendChild(new Option(seasonLabel(y), String(y))));
+  if ([...sSel.options].some(o => o.value === prevSeason)) sSel.value = prevSeason;
 
   const pSel = document.getElementById('f-player');
+  const prevPlayer = pSel.value;
   const order = RAW.players.map((name,i)=>({name,i})).sort((a,b)=>a.name.localeCompare(b.name));
+  pSel.replaceChildren();
   order.forEach(({name,i}) => pSel.appendChild(new Option(name, String(i))));
+  if ([...pSel.options].some(o => o.value === prevPlayer)) pSel.value = prevPlayer;
 }
 
 function render(){
   const content = document.getElementById('content');
   const playerIdx = Number(v('f-player'));
   if (!RAW.players.length){
-    content.innerHTML = '<div class="empty">表示できるデータがありません</div>';
+    content.innerHTML = `<div class="empty">${U().no_data}</div>`;
     return;
   }
   const pos = RAW.playerPos[playerIdx];
@@ -214,40 +277,58 @@ function render(){
   head.innerHTML = `<div class="name">${RAW.players[playerIdx]}</div><div class="pos">${pos || ''}</div>`;
   content.appendChild(head);
 
-  const ptCard = section(content, 'プレータイム(シーズン別、フィルタ非依存)');
+  const ptCard = section(content, U().sec_time);
   ptCard.appendChild(playtimeTable(playerIdx));
 
-  const atk = section(content, 'アタック');
-  totalAvgRow(atk, 'キャリー', c, 'carries', 0);
-  totalAvgRow(atk, 'キャリーゲインm', c, 'carry_distplus', 0);
-  totalAvgRow(atk, 'ポストコンタクトm', c, 'carry_post', 0);
-  totalAvgRow(atk, 'DF Beaten', c, 'def_beaten', 0);
-  totalAvgRow(atk, 'オフロード', c, 'offload', 0);
-  pctRow(atk, 'オフロード成功率', c, 'offload_success', 'offload');
-  totalAvgRow(atk, 'ラインブレイク', c, 'linebreak', 0);
-  totalAvgRow(atk, 'パス', c, 'passes', 0);
+  const atk = section(content, U().sec_attack);
+  totalAvgRow(atk, U().m_carries, c, 'carries', 0);
+  totalAvgRow(atk, U().m_carrym, c, 'carry_distplus', 0);
+  totalAvgRow(atk, U().m_post, c, 'carry_post', 0);
+  totalAvgRow(atk, U().m_beaten, c, 'def_beaten', 0);
+  totalAvgRow(atk, U().m_offload, c, 'offload', 0);
+  pctRow(atk, U().m_offload_pct, c, 'offload_success', 'offload');
+  totalAvgRow(atk, U().m_linebreak, c, 'linebreak', 0);
+  totalAvgRow(atk, U().m_passes, c, 'passes', 0);
 
-  const def = section(content, 'ディフェンス');
-  totalAvgRow(def, 'タックル', c, 'tackles', 0);
-  pctRow(def, 'タックル成功率', c, 'tk_succ', 'tackles');
-  totalAvgRow(def, 'ジャッカル', c, 'jackal', 0);
-  pctRow(def, 'ジャッカル成功率', c, 'jackal_won', 'jackal');
+  const def = section(content, U().sec_defense);
+  totalAvgRow(def, U().m_tackles, c, 'tackles', 0);
+  pctRow(def, U().m_tackle_pct, c, 'tk_succ', 'tackles');
+  totalAvgRow(def, U().m_jackal, c, 'jackal', 0);
+  pctRow(def, U().m_jackal_pct, c, 'jackal_won', 'jackal');
 
-  const ooa = section(content, 'ブレイクダウン関与(Ruck OOA)');
-  totalAvgRow(ooa, 'アタックOOA', c, 'atk_ooa', 0);
-  totalAvgRow(ooa, 'ディフェンスOOA', c, 'def_ooa', 0);
+  const ooa = section(content, U().sec_breakdown);
+  totalAvgRow(ooa, U().m_atk_ooa, c, 'atk_ooa', 0);
+  totalAvgRow(ooa, U().m_def_ooa, c, 'def_ooa', 0);
 
-  const kick = section(content, 'キック');
-  totalAvgRow(kick, 'キック数', c, 'kicks', 0);
-  totalAvgRow(kick, 'キックメーター', c, 'kick_mtr', 0);
+  const kick = section(content, U().sec_kick);
+  totalAvgRow(kick, U().m_kicks, c, 'kicks', 0);
+  totalAvgRow(kick, U().m_kickmtr, c, 'kick_mtr', 0);
   kickMix(kick, c);
 
-  const other = section(content, 'その他');
-  statRow(other, 'Action/Min', c.playtime ? c.actions/c.playtime : 0, 2);
+  const other = section(content, U().sec_other);
+  statRow(other, U().m_apm, c.playtime ? c.actions/c.playtime : 0, 2);
 
   fwBlock(content, pos, c);
   scrumBlock(content, c);
 }
+
+function setChrome(){
+  document.documentElement.lang = LANG;
+  document.title = U().title + ' — Toshiba Master Data';
+  document.getElementById('nav-home').textContent = U().nav_home;
+  document.getElementById('nav-rugby').textContent = U().nav_rugby;
+  document.getElementById('nav-gym').textContent = U().nav_gym;
+  document.getElementById('nav-conditioning').textContent = U().nav_conditioning;
+  document.getElementById('logout-btn').textContent = U().logout_btn;
+  document.getElementById('lang-toggle').textContent = U().lang_btn;
+  document.getElementById('page-title').textContent = U().title;
+  document.getElementById('page-sub').textContent = U().sub;
+  document.getElementById('lbl-season').textContent = U().f_season;
+  document.getElementById('lbl-player').textContent = U().f_player;
+  document.getElementById('loading-msg').textContent = U().loading;
+  document.getElementById('page-foot').textContent = U().foot;
+}
+setChrome();
 
 async function doLogout(){
   await sb.auth.signOut();
@@ -256,6 +337,12 @@ async function doLogout(){
 document.getElementById('logout-btn').addEventListener('click', doLogout);
 document.getElementById('f-season').addEventListener('change', render);
 document.getElementById('f-player').addEventListener('change', render);
+document.getElementById('lang-toggle').addEventListener('click', () => {
+  LANG = LANG === 'ja' ? 'en' : 'ja';
+  localStorage.setItem('toshibaMasterDataLang', LANG);
+  setChrome();
+  if (RAW.players.length){ fillFilters(); render(); }
+});
 
 async function init(){
   const { data: { session } } = await sb.auth.getSession();
@@ -267,7 +354,7 @@ async function init(){
   // Supabase query -- the session check above just gates the page itself,
   // consistent with how the other Toshiba Master Data pages work.
   if (!RAW.players.length){
-    document.getElementById('content').innerHTML = '<div class="empty">データが読み込まれていません</div>';
+    document.getElementById('content').innerHTML = `<div class="empty">${U().no_data}</div>`;
     return;
   }
   fillFilters();
