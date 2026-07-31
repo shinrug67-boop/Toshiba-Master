@@ -27,13 +27,17 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 .login-card button:hover { background:#1f63b5; }
 .login-card button:disabled { opacity:.6; cursor:default; }
 .login-card .err { color:#d64545; font-size:12px; margin-top:8px; min-height:1em; }
-#lang-toggle{position:fixed;top:14px;right:14px;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--surface);
-  border:1px solid var(--border);border-radius:6px;padding:5px 11px;cursor:pointer;}
-#lang-toggle:hover{background:rgba(128,128,128,.1);}
+.lang-switch{position:fixed;top:14px;right:14px;display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.lang-switch button{font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;border:none;background:var(--surface);color:var(--ink-2);}
+.lang-switch button:hover{background:rgba(128,128,128,.1);}
+.lang-switch button.active{background:#2a78d6;color:#fff;}
 </style>
 </head>
 <body>
-<button id="lang-toggle" type="button">EN</button>
+<div class="lang-switch">
+  <button id="lang-ja" type="button">日本語</button>
+  <button id="lang-en" type="button">EN</button>
+</div>
 <div class="login-card">
   <div class="brand">🏉 Toshiba Master Data</div>
   <div class="brand-sub" id="brand-sub"></div>
@@ -45,8 +49,8 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 </div>
 <script>
 const UI = {
-  ja: { brand_sub:'コーチングスタッフ専用', title:'ログイン', btn:'ログイン', lang_btn:'EN' },
-  en: { brand_sub:'Coaching staff only', title:'Sign in', btn:'Sign in', lang_btn:'日本語' },
+  ja: { brand_sub:'コーチングスタッフ専用', title:'ログイン', btn:'ログイン' },
+  en: { brand_sub:'Coaching staff only', title:'Sign in', btn:'Sign in' },
 };
 let LANG = localStorage.getItem('toshibaMasterDataLang') ||
   ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
@@ -56,14 +60,17 @@ function setChrome(){
   document.getElementById('brand-sub').textContent = U().brand_sub;
   document.getElementById('login-title').textContent = U().title;
   document.getElementById('login-submit').textContent = U().btn;
-  document.getElementById('lang-toggle').textContent = U().lang_btn;
+  document.getElementById('lang-ja').classList.toggle('active', LANG === 'ja');
+  document.getElementById('lang-en').classList.toggle('active', LANG === 'en');
 }
 setChrome();
-document.getElementById('lang-toggle').addEventListener('click', () => {
-  LANG = LANG === 'ja' ? 'en' : 'ja';
+function setLang(lang){
+  LANG = lang;
   localStorage.setItem('toshibaMasterDataLang', LANG);
   setChrome();
-});
+}
+document.getElementById('lang-ja').addEventListener('click', () => setLang('ja'));
+document.getElementById('lang-en').addEventListener('click', () => setLang('en'));
 </script>
 <script>
 // Toshiba Master Data's own Supabase project (separate from the

@@ -21,9 +21,13 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
 .topnav .navlinks a:hover{background:rgba(255,255,255,.06);}
 .topnav .navlinks a.active{background:var(--red);color:#fff;}
 .topnav .spacer{flex:1;}
-#logout-btn,#lang-toggle{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
+#logout-btn{font-size:12px;font-weight:700;color:var(--gold);background:var(--page);border:1px solid var(--border);
   border-radius:6px;padding:5px 11px;cursor:pointer;white-space:nowrap;}
-#logout-btn:hover,#lang-toggle:hover{background:rgba(255,255,255,.06);}
+#logout-btn:hover{background:rgba(255,255,255,.06);}
+.lang-switch{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.lang-switch button{font-size:12px;font-weight:700;padding:5px 10px;cursor:pointer;border:none;background:var(--page);color:var(--gold);white-space:nowrap;}
+.lang-switch button:hover{background:rgba(255,255,255,.06);}
+.lang-switch button.active{background:var(--red);color:#fff;}
 .wrap { max-width:900px; margin:0 auto; padding:18px var(--gap) 40px; }
 header h1 { font-size:20px; font-weight:800; }
 header .sub { font-size:12.5px; color:var(--ink-2); margin-top:2px; }
@@ -64,7 +68,10 @@ footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
     <a href="conditioning.html" id="nav-conditioning"></a>
   </div>
   <span class="spacer"></span>
-  <button id="lang-toggle" type="button"></button>
+  <div class="lang-switch">
+    <button id="lang-ja" type="button">日本語</button>
+    <button id="lang-en" type="button">EN</button>
+  </div>
   <button id="logout-btn" type="button"></button>
 </nav>
 <div class="wrap">
@@ -95,7 +102,7 @@ const LO_POS = new Set(['Lock (4)','Lock (5)','Openside Flanker','Blindside Flan
 
 const UI = {
   ja: { nav_home:'ホーム', nav_rugby:'ラグビー', nav_gym:'ジム', nav_conditioning:'コンディショニング',
-    logout_btn:'ログアウト', lang_btn:'EN',
+    logout_btn:'ログアウト',
     title:'ラグビー個人スタッツ',
     sub:'Toshiba Brave Lupus Tokyo — Attack / Defense / Kicking / Scrum / Lineout(データ: Opta Stats Perform)',
     f_season:'シーズン', f_player:'選手', all_option:'すべて',
@@ -124,7 +131,7 @@ const UI = {
       + ' アタックスクラム成功率=Offensive Scrum個人参加行のWon系÷総参加数 / ディフェンススクラム成功率=Defensive Scrum個人参加行のうち反則を与えなかった割合。'
       + ' ポジションは選手の生涯最頻出ポジション。データ: Opta(Stats Perform, Level 2 Restricted)。このページはログインしたコーチングスタッフのみ閲覧できます。' },
   en: { nav_home:'Home', nav_rugby:'Rugby', nav_gym:'Gym', nav_conditioning:'Conditioning',
-    logout_btn:'Sign out', lang_btn:'日本語',
+    logout_btn:'Sign out',
     title:'Rugby Player Stats',
     sub:'Toshiba Brave Lupus Tokyo — Attack / Defense / Kicking / Scrum / Lineout (Data: Opta Stats Perform)',
     f_season:'Season', f_player:'Player', all_option:'All',
@@ -320,7 +327,8 @@ function setChrome(){
   document.getElementById('nav-gym').textContent = U().nav_gym;
   document.getElementById('nav-conditioning').textContent = U().nav_conditioning;
   document.getElementById('logout-btn').textContent = U().logout_btn;
-  document.getElementById('lang-toggle').textContent = U().lang_btn;
+  document.getElementById('lang-ja').classList.toggle('active', LANG === 'ja');
+  document.getElementById('lang-en').classList.toggle('active', LANG === 'en');
   document.getElementById('page-title').textContent = U().title;
   document.getElementById('page-sub').textContent = U().sub;
   document.getElementById('lbl-season').textContent = U().f_season;
@@ -337,12 +345,14 @@ async function doLogout(){
 document.getElementById('logout-btn').addEventListener('click', doLogout);
 document.getElementById('f-season').addEventListener('change', render);
 document.getElementById('f-player').addEventListener('change', render);
-document.getElementById('lang-toggle').addEventListener('click', () => {
-  LANG = LANG === 'ja' ? 'en' : 'ja';
+function setLang(lang){
+  LANG = lang;
   localStorage.setItem('toshibaMasterDataLang', LANG);
   setChrome();
   if (RAW.players.length){ fillFilters(); render(); }
-});
+}
+document.getElementById('lang-ja').addEventListener('click', () => setLang('ja'));
+document.getElementById('lang-en').addEventListener('click', () => setLang('en'));
 
 async function init(){
   const { data: { session } } = await sb.auth.getSession();
