@@ -160,5 +160,7 @@ update squad_players set name = 'Yuto Mori' where name = 'MORI YUTO';
 -- didn't match the strict initial+surname / two-word-reorder heuristics
 -- above: "AMUELA" is a typo for "SAMUELA" (missing leading S), and
 -- "Du Toit" is a two-word surname the initial-pattern regex didn't allow.
-update squad_players set name = 'Samuela Anise' where name = 'ANISE AMUELA';
+-- Correct name order is "Anise Samuela" (confirmed by the user) -- the
+-- rugby roster's "Samuela Anise" has the two tokens swapped.
+update squad_players set name = 'Anise Samuela' where name = 'ANISE AMUELA';
 update squad_players set name = 'Stephanus Du Toit' where name = 'S.Du Toit';
