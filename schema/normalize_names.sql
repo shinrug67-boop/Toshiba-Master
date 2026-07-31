@@ -211,3 +211,4 @@ delete from squad_players where name = 'Hiroki.Y';
 
 update squad_players set name = 'Yuta Okamura' where name = 'Y.Okamura';
 update squad_players set name = 'Riku Tokito' where name = 'R.Tokito';
+update squad_players set name = 'Ryusei Koyanagi' where name = 'R.Koyanagi';
