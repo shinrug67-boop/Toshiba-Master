@@ -61,7 +61,10 @@ def main():
     if START_MARK not in html or END_MARK not in html:
         raise SystemExit(f'markers {START_MARK} / {END_MARK} not found in {RUGBY_HTML}')
     pattern = re.compile(re.escape(START_MARK) + '.*?' + re.escape(END_MARK), re.S)
-    html = pattern.sub(START_MARK + js + END_MARK, html, count=1)
+    # Function replacement, not a plain string -- re.sub parses backslash
+    # sequences in a string replacement as escape/backref syntax, which would
+    # corrupt the JSON if a name ever contains a backslash.
+    html = pattern.sub(lambda m: START_MARK + js + END_MARK, html, count=1)
     open(RUGBY_HTML, 'w').write(html)
 
     print(f'{TEAM_NAME}: {len(payload["players"])} players, {len(payload["P"])} rows, '

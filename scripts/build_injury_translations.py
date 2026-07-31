@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+"""Writes data/translations/injury_ja_en.json (a hand-built ja->en lookup for
+the free-text fields in Record of past injuries.xlsx that contain Japanese:
+Injury, Memo, Consultation Day, Return Date, Hospital2 -- see
+schema/schema.sql, these are stored as-is in injuries.raw), then embeds that
+JSON into site/conditioning.html between markers so the page can show an
+English rendering of those fields without a live translation service.
+
+This is a best-effort translation of medical/orthopedic terminology and
+free-text staff notes, not a professional medical translation -- have
+medical staff spot-check the diagnosis (Injury) translations before relying
+on them.
+
+Usage:
+  python3 build_injury_translations.py
+"""
+import json
+import os
+import re
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+JSON_OUT = os.path.join(HERE, '..', 'data', 'translations', 'injury_ja_en.json')
+CONDITIONING_HTML = os.path.join(HERE, '..', 'site', 'conditioning.html')
+START_MARK = '/*INJURY_TRANSLATIONS_START*/'
+END_MARK = '/*INJURY_TRANSLATIONS_END*/'
+
+TRANSLATIONS = {
+    # --- Injury (diagnosis) ---
+    'ACL・MCL': 'ACL & MCL',
+    'Eversion Sprain・Lisfranc joint Sprain': 'Eversion Sprain & Lisfranc Joint Sprain',
+    'MCL・Bone bruise': 'MCL & Bone Bruise',
+    'MPJt靱帯損傷': 'MP Joint Ligament Injury',
+    'Patellar subluxation  ・MCL': 'Patellar Subluxation & MCL',
+    '上背部痛': 'Upper Back Pain',
+    '上腕二頭筋断裂': 'Biceps Brachii Rupture',
+    '上腕骨Bone Bruise': 'Humerus Bone Bruise',
+    '中手骨骨折': 'Metacarpal Fracture',
+    '中間広筋筋損傷': 'Vastus Intermedius Muscle Injury',
+    '仙腸関節痛': 'Sacroiliac Joint Pain',
+    '伸展強制': 'Forced Hyperextension',
+    '右Orbital floor fracture': 'Right Orbital Floor Fracture',
+    '外閉鎖筋損傷': 'Obturator Externus Muscle Injury',
+    '大胸筋筋損傷': 'Pectoralis Major Muscle Injury',
+    '大胸筋腱損傷': 'Pectoralis Major Tendon Injury',
+    '大腿直筋付着部炎': 'Rectus Femoris Enthesitis',
+    '小指DIP開放Dislocation': 'Little Finger DIP Open Dislocation',
+    '左腹部Bruise': 'Left Abdominal Bruise',
+    '後脛骨筋Strain': 'Tibialis Posterior Strain',
+    '後頭神経痛': 'Occipital Neuralgia',
+    '感染症': 'Infection',
+    '手関節Sprain': 'Wrist Sprain',
+    '拇趾MPjt': 'Big Toe MP Joint Injury',
+    '椎間板Hernia': 'Disc Herniation',
+    '椎間板変性': 'Disc Degeneration',
+    '環軸関節亜Dislocation': 'Atlantoaxial Subluxation',
+    '眼窩内壁骨折': 'Orbital Medial Wall Fracture',
+    '睾丸Bruise': 'Testicular Bruise',
+    '立方骨周囲炎': 'Cuboid Periostitis',
+    '第2中手骨骨折': '2nd Metacarpal Fracture',
+    '第3趾中節骨骨折': '3rd Toe Middle Phalanx Fracture',
+    '第5中節骨骨折': '5th Middle Phalanx Fracture',
+    '第一中手骨骨折': '1st Metacarpal Fracture',
+    '第四中手骨骨折': '4th Metacarpal Fracture',
+    '肋骨骨折': 'Rib Fracture',
+    '股関節周囲炎': 'Hip Periarthritis',
+    '股関節痛': 'Hip Pain',
+    '肩関節周囲炎': 'Shoulder Periarthritis',
+    '肩関節痛': 'Shoulder Pain',
+    '胸肋関節': 'Sternocostal Joint',
+    '胸肋関節Sprain': 'Sternocostal Joint Sprain',
+    '腓骨骨折': 'Fibula Fracture',
+    '腰椎椎間板Hernia': 'Lumbar Disc Herniation',
+    '腱板・Labrum injury': 'Rotator Cuff & Labrum Injury',
+    '腱板損傷': 'Rotator Cuff Injury',
+    '腸脛靭帯炎': 'Iliotibial Band Syndrome',
+    '腸骨稜 Bruise': 'Iliac Crest Bruise',
+    '腸骨筋Strain': 'Iliacus Strain',
+    '腹斜筋損傷': 'Oblique Muscle Injury',
+    '腹直筋 Strain': 'Rectus Abdominis Strain',
+    '膝関節周囲炎': 'Knee Periarthritis',
+    '臀部痛': 'Buttock Pain',
+    '蜂窩織炎': 'Cellulitis',
+    '裂傷': 'Laceration',
+    '足関節痛': 'Ankle Pain',
+    '踵骨周辺部痛': 'Calcaneal Region Pain',
+    '軟骨・Meniscus': 'Cartilage & Meniscus Injury',
+    '遊離体': 'Loose Body',
+    '遠位橈尺関節Dislocation': 'Distal Radioulnar Joint Dislocation',
+    '鎖骨骨折': 'Clavicle Fracture',
+    '頚椎捻挫': 'Cervical Spine Sprain',
+    '頚部痛': 'Neck Pain',
+    '頬骨骨折': 'Zygomatic (Cheekbone) Fracture',
+    '頸椎振盪': 'Cervical Spine Concussion',
+    '頸椎症': 'Cervical Spondylosis',
+    '鵞足炎': 'Pes Anserine Bursitis',
+
+    # --- Memo (free text) ---
+    '*7日復帰ではICCレビューが必要なため、12日復帰(6/10にRTP日数変更/塚脇)':
+        '*A 7-day return would require ICC review, so changed to a 12-day return (RTP days changed 6/10 / Tsukawaki)',
+    '12/2整復、12/6再診': 'Reduction on 12/2, follow-up on 12/6',
+    '4/8:MM ope 5/20:ACL\n入院:4/7-4/15、5/19-5/30':
+        '4/8: Meniscus surgery, 5/20: ACL surgery\nHospitalized: 4/7-4/15, 5/19-5/30',
+    'Box Jumpで負傷': 'Injured during box jump',
+    'Box Jumpの着地時に負傷(glade0.5)': 'Injured landing from a box jump (grade 0.5)',
+    'bye week中に整復': 'Reduced during bye week',
+    'game w-up(unit)で患部を踏まれ受傷': 'Injured when stepped on during game warm-up (unit)',
+    'game w-upで受傷': 'Injured during game warm-up',
+    'ope日': 'Surgery date',
+    'ope日(両側)': 'Surgery date (both sides)',
+    'ope日/右環指中節骨の基部の伸筋腱と側副靭帯の付着部の裂離骨折/シーズン終了 RTP概算':
+        'Surgery date / Avulsion fracture at the extensor tendon and collateral ligament '
+        'attachment at the base of the right ring finger middle phalanx / Season over, RTP estimated',
+    'speed:unitのスピードセッションで受傷': 'Injured during unit speed session',
+    'walk throughで悪化': 'Worsened during walk-through',
+    'エコー下でのAITFL損傷も確認': 'AITFL injury also confirmed via ultrasound',
+    'クラブラグビー': 'Club rugby',
+    'クラブラグビーでの受傷、順天堂hosp/代表関連': 'Injured playing club rugby, Juntendo Hospital / national team related',
+    'クリーン種目で受傷': 'Injured during the clean (weightlifting exercise)',
+    'コンディショニングフィットネス*Non member sessionでの受傷': 'Injured during conditioning fitness (non-member session)',
+    'コンディショニングフィットネス*Non member sessionで離脱': 'Withdrew during conditioning fitness (non-member session)',
+    'シーズン終了': 'Season over',
+    'シーズン終了 RTP概算': 'Season over, RTP estimated',
+    'ジャッカル姿勢での受傷': 'Injured in jackal position',
+    'ジャンプ着地時に内返しで受傷': 'Injured via inversion on jump landing',
+    'タックル時に相手の肘が顔にあたり受傷': "Injured when opponent's elbow hit face during tackle",
+    'ハンドオフ??': 'Handoff??',
+    'ベンチプレスによる受傷': 'Injured during bench press',
+    'リハビリ期間中の受傷': 'Injured during rehab period',
+    'リハラン中に受傷': 'Injured during rehab run',
+    '代表期間中': 'During national team duty',
+    '代表期間中/ope:血腫の除去': 'During national team duty / Surgery: hematoma removal',
+    '代表期間中/順天堂hosp': 'During national team duty / Juntendo Hospital',
+    '個人練習でのランニング': 'Running during individual training',
+    '前週のUnitのSppedで違和感を感じるも同週の試合は出場。違和感が消えず、12/5に訴える':
+        "Felt discomfort during the unit speed session the previous week but still played that "
+        "week's match. Discomfort did not resolve; reported on 12/5",
+    '加速時に受傷': 'Injured during acceleration',
+    '受傷機転不明': 'Mechanism of injury unknown',
+    '受傷機転不明(L:4th/5th Finger PIP Collateral Lig. R:5th Finger PIP Collateral Lig.)':
+        'Mechanism of injury unknown (L: 4th/5th finger PIP collateral ligament, R: 5th finger PIP collateral ligament)',
+    '受傷機転不明(以前よりタイトネスの訴えあり)/ACL rehab中に受傷':
+        'Mechanism of injury unknown (had reported tightness previously) / Injured during ACL rehab',
+    '受傷機転不明(前日に犬の散歩..?)、リハビリ期間中の受傷':
+        'Mechanism of injury unknown (walked the dog the day before..?), injured during rehab period',
+    '多摩総合病院口腔外科(5/9)': 'Tama General Hospital, Oral Surgery (5/9)',
+    '後頚部': 'Posterior neck',
+    '着地の際、足に乗っかってしまい負傷': 'Injured when landing awkwardly on a foot',
+    '練習後top upで受傷': 'Injured during post-practice top-up',
+    '練習後に症状出現,受傷機転不明': 'Symptoms appeared after practice, mechanism of injury unknown',
+    '練習後のtop upでの受傷': 'Injured during post-practice top-up',
+    '練習後プレスキック中の受傷(12/28)\n離脱日記載': 'Injured during place-kicking practice after training (12/28)\nWithdrawal date noted',
+    '腫脹が出現し再診\nPRP:10/15, 11/11': 'Swelling appeared, follow-up visit\nPRP: 10/15, 11/11',
+    '試合で受傷、離脱日記載': 'Injured during match, withdrawal date noted',
+    '試合当日NTTにて受診': 'Seen at NTT (hospital) on match day',
+    '踏まれて受傷': 'Injured after being stepped on',
+    '途中離脱': 'Left the field partway through',
+    '陳旧性??': 'Chronic/old injury??',
+    '離脱日/Box SQで受傷(1/19)': 'Withdrawal date / Injured during box squat (1/19)',
+    '離脱日記載': 'Withdrawal date noted',
+    '離脱日記載\n1/21 JISS診察': 'Withdrawal date noted\nJISS consultation 1/21',
+    '離脱日記載\n自分の足が当たって負傷': 'Withdrawal date noted\nInjured when own foot made contact',
+    '離脱日記載(11/28受傷)\n翌日、眼科受診': 'Withdrawal date noted (injured 11/28)\nOphthalmology visit the next day',
+    '離脱日記載/ペインクリニック': 'Withdrawal date noted / Pain clinic',
+    '離脱日記載/受傷機転不明': 'Withdrawal date noted / Mechanism of injury unknown',
+    '頭と地面': 'Head and ground',
+    '頭と腰': 'Head and lower back',
+    '頭と頭': 'Head and head',
+    '顎と顔面': 'Jaw and face',
+    '顔面と後頭部(味方)': 'Face and back of head (teammate)',
+
+    # --- Consultation Day ---
+    '2025/12/15,2026/2/25(経過診察)': '2025/12/15, 2026/2/25 (follow-up exam)',
+    '2026/1/17,2026/2/18(経過診察)': '2026/1/17, 2026/2/18 (follow-up exam)',
+    '4/13(術後診察)': '4/13 (post-op exam)',
+
+    # --- Return Date ---
+    '帰国': 'Returned to home country',
+    '未復帰': 'Not yet returned',
+    '離脱なし': 'No absence',
+
+    # --- Hospital2 ---
+    '杏林大学病院:形成外科(三鷹)': 'Kyorin University Hospital: Plastic Surgery (Mitaka)',
+}
+
+
+def main():
+    os.makedirs(os.path.dirname(JSON_OUT), exist_ok=True)
+    with open(JSON_OUT, 'w') as f:
+        json.dump(TRANSLATIONS, f, ensure_ascii=False, indent=2, sort_keys=True)
+    print(f'wrote {JSON_OUT} ({len(TRANSLATIONS)} entries)')
+
+    js = json.dumps(TRANSLATIONS, ensure_ascii=False, separators=(',', ':'))
+    html = open(CONDITIONING_HTML).read()
+    if START_MARK not in html or END_MARK not in html:
+        raise SystemExit(f'markers {START_MARK} / {END_MARK} not found in {CONDITIONING_HTML}')
+    pattern = re.compile(re.escape(START_MARK) + '.*?' + re.escape(END_MARK), re.S)
+    # Use a function replacement, not a plain string: re.sub interprets
+    # backslash sequences (e.g. the \n produced by json.dumps for the
+    # multi-line Memo entries) in a *string* replacement as escape/backref
+    # syntax, which corrupts the JSON by turning "\n" back into a literal
+    # newline. A callable replacement is used verbatim, with no such parsing.
+    html = pattern.sub(lambda m: START_MARK + js + END_MARK, html, count=1)
+    open(CONDITIONING_HTML, 'w').write(html)
+    print(f'embedded into {CONDITIONING_HTML} ({len(js) // 1024} KB)')
+
+
+if __name__ == '__main__':
+    main()
