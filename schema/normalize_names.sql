@@ -164,3 +164,29 @@ update squad_players set name = 'Yuto Mori' where name = 'MORI YUTO';
 -- rugby roster's "Samuela Anise" has the two tokens swapped.
 update squad_players set name = 'Anise Samuela' where name = 'ANISE AMUELA';
 update squad_players set name = 'Stephanus Du Toit' where name = 'S.Du Toit';
+-- Title-case the remaining ALL CAPS names (no rugby-data match to
+-- cross-reference, so just normalize capitalization: first letter of
+-- each word uppercase, rest lowercase).
+update squad_players set name = 'Chinen Yu' where name = 'CHINEN YU';
+update squad_players set name = 'Fujita Takahiro' where name = 'FUJITA TAKAHIRO';
+update squad_players set name = 'Gwante Kim' where name = 'GWANTE KIM';
+update squad_players set name = 'Hirata Kai' where name = 'HIRATA KAI';
+update squad_players set name = 'Ishii Kai' where name = 'ISHII KAI';
+update squad_players set name = 'Ito Shin' where name = 'ITO SHIN';
+update squad_players set name = 'Iwafuchi Makoto' where name = 'IWAFUCHI MAKOTO';
+update squad_players set name = 'Jack Stratton' where name = 'JACK STRATTON';
+update squad_players set name = 'Kasai Hiroto' where name = 'KASAI HIROTO';
+update squad_players set name = 'Kobayashi Yohei' where name = 'KOBAYASHI YOHEI';
+update squad_players set name = 'Matsuoka Hisayoshi' where name = 'MATSUOKA HISAYOSHI';
+update squad_players set name = 'Matt Todd' where name = 'MATT TODD';
+update squad_players set name = 'Miyagami Ren' where name = 'MIYAGAMI REN';
+update squad_players set name = 'Morita Yoshikazu' where name = 'MORITA YOSHIKAZU';
+update squad_players set name = 'Murayama Ren' where name = 'MURAYAMA REN';
+update squad_players set name = 'Natsui Daisuke' where name = 'NATSUI DAISUKE';
+update squad_players set name = 'Ono Hitoshi' where name = 'ONO HITOSHI';
+update squad_players set name = 'Ouchi Shin' where name = 'OUCHI SHIN';
+update squad_players set name = 'Rye On Yoon' where name = 'RYE ON YOON';
+update squad_players set name = 'Takagi Shoichi' where name = 'TAKAGI SHOICHI';
+update squad_players set name = 'Tim Bateman' where name = 'TIM BATEMAN';
+update squad_players set name = 'Tom Taylor' where name = 'TOM TAYLOR';
+update squad_players set name = 'Yoshida Tomoki' where name = 'YOSHIDA TOMOKI';
