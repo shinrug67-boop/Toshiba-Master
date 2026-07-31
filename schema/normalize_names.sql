@@ -202,3 +202,12 @@ delete from squad_players where name = 'R.Mounga';
 
 update injuries set squad_player_id = (select id from squad_players where name = 'Michael Collins') where squad_player_id = (select id from squad_players where name = 'M.Colins');
 delete from squad_players where name = 'M.Colins';
+
+-- Reported by the user: Hiroki.Y duplicates the already-renamed
+-- "Hiroki Yamamoto" row (merge); Y.Okamura/R.Tokito are single entries with
+-- no rugby-roster overlap, canonical spelling supplied directly by the user.
+update injuries set squad_player_id = (select id from squad_players where name = 'Hiroki Yamamoto') where squad_player_id = (select id from squad_players where name = 'Hiroki.Y');
+delete from squad_players where name = 'Hiroki.Y';
+
+update squad_players set name = 'Yuta Okamura' where name = 'Y.Okamura';
+update squad_players set name = 'Riku Tokito' where name = 'R.Tokito';
