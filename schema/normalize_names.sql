@@ -212,3 +212,13 @@ delete from squad_players where name = 'Hiroki.Y';
 update squad_players set name = 'Yuta Okamura' where name = 'Y.Okamura';
 update squad_players set name = 'Riku Tokito' where name = 'R.Tokito';
 update squad_players set name = 'Ryusei Koyanagi' where name = 'R.Koyanagi';
+
+-- Reported by the user: S.Kamei has no duplicate, simple rename. S.Takagi
+-- duplicates "Takagi Shoichi" (from the earlier title-case pass), but that
+-- title-casing preserved the sheet's surname-first word order without
+-- knowing to flip it -- correct order is "Shoichi Takagi", per the user.
+update squad_players set name = 'Senfu Kamei' where name = 'S.Kamei';
+
+update squad_players set name = 'Shoichi Takagi' where name = 'Takagi Shoichi';
+update injuries set squad_player_id = (select id from squad_players where name = 'Shoichi Takagi') where squad_player_id = (select id from squad_players where name = 'S.Takagi');
+delete from squad_players where name = 'S.Takagi';
