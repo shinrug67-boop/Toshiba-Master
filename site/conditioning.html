@@ -41,10 +41,14 @@ tbody td { padding:7px 9px; border-bottom:1px solid var(--grid); vertical-align:
 tbody tr:hover { background: rgba(255,255,255,.04); }
 tbody tr.detail-row { display:none; }
 tbody tr.detail-row.open { display:table-row; }
-.detail-row td { background:rgba(255,255,255,.02); padding:10px 14px; }
-.detail-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:6px 16px; }
-.detail-grid .k { color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.03em; }
-.detail-grid .v { font-size:13px; }
+.detail-row td { background:rgba(255,255,255,.02); padding:14px 16px; }
+.detail-section + .detail-section { margin-top:14px; }
+.detail-section h4 { font-size:11px; font-weight:700; color:var(--gold); text-transform:uppercase;
+  letter-spacing:.04em; margin-bottom:8px; border-left:3px solid var(--red); padding-left:8px; }
+.detail-fields { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; }
+.field { background:var(--page); border:1px solid var(--grid); border-radius:6px; padding:7px 10px; min-width:0; }
+.field .k { color:var(--gold); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-bottom:3px; }
+.field .v { font-size:13.5px; color:var(--ink-1); word-break:break-word; }
 .toggle-btn { background:none; border:1px solid var(--border); color:var(--ink-2); border-radius:5px;
   font-size:11px; padding:3px 8px; cursor:pointer; }
 .toggle-btn:hover { background:rgba(255,255,255,.06); }
@@ -126,6 +130,45 @@ function situationPill(raw){
   return `<span class="pill ${cls}">${s}</span>`;
 }
 
+// Groups + Japanese labels for the raw Excel columns, so the detail panel
+// reads as labeled sections instead of one long undifferentiated grid of
+// 20-30 same-size key/value pairs (which is what made it hard to scan).
+const DETAIL_SECTIONS = [
+  { title: '基本情報', fields: {
+    'R/L': '左右', 'Part': '部位', 'Part Other': '部位(その他)', 'Type': '種別', 'Injury': '診断',
+    'Session': 'セッション', 'Att/Def': '攻撃/守備', 'Event': 'イベント',
+    'Situation': '状況', 'Other': 'その他' } },
+  { title: '受診・処置', fields: {
+    'Consultation': '受診', 'Consultation Day': '受診日', 'Hospital': '病院', 'Dr.1': '医師1',
+    'Image': '画像診断', 'HBO': '高気圧酸素療法', 'Ope.': '手術', 'Surgery Day': '手術日',
+    'Hospital2': '病院2', 'Dr.2': '医師2', 'Ad': '入院日', 'Ent': '退院日',
+    'Hospitalization': '入院期間' } },
+  { title: '復帰', fields: {
+    'Start Jog': 'ジョグ開始', 'Start Splint': '装具開始', 'Return Date': '復帰日',
+    'To RTP': '復帰まで(日)' } },
+  { title: 'メモ', fields: { 'Memo': 'メモ' } },
+];
+
+function buildDetailSections(raw){
+  const container = document.createElement('div');
+  DETAIL_SECTIONS.forEach(({ title, fields }) => {
+    const entries = Object.entries(fields).filter(([k]) => raw[k] != null && raw[k] !== '');
+    if (!entries.length) return;
+    const section = document.createElement('div'); section.className = 'detail-section';
+    const h = document.createElement('h4'); h.textContent = title; section.appendChild(h);
+    const grid = document.createElement('div'); grid.className = 'detail-fields';
+    entries.forEach(([k, label]) => {
+      const field = document.createElement('div'); field.className = 'field';
+      field.innerHTML = `<div class="k">${label}</div><div class="v"></div>`;
+      field.querySelector('.v').textContent = raw[k];
+      grid.appendChild(field);
+    });
+    section.appendChild(grid);
+    container.appendChild(section);
+  });
+  return container;
+}
+
 function render(){
   const rows = filtered();
   const content = document.getElementById('content');
@@ -148,14 +191,8 @@ function render(){
     const detailTr = document.createElement('tr');
     detailTr.className = 'detail-row';
     const detailTd = document.createElement('td'); detailTd.colSpan = 8;
-    const grid = document.createElement('div'); grid.className = 'detail-grid';
-    Object.entries(raw).forEach(([k, v]) => {
-      if (v == null || v === '') return;
-      const kEl = document.createElement('div'); kEl.className = 'k'; kEl.textContent = k;
-      const vEl = document.createElement('div'); vEl.className = 'v'; vEl.textContent = v;
-      grid.appendChild(kEl); grid.appendChild(vEl);
-    });
-    detailTd.appendChild(grid); detailTr.appendChild(detailTd);
+    detailTd.appendChild(buildDetailSections(raw));
+    detailTr.appendChild(detailTd);
     const toggle = () => detailTr.classList.toggle('open');
     tr.addEventListener('click', toggle);
     tbody.appendChild(tr); tbody.appendChild(detailTr);
