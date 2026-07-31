@@ -40,12 +40,12 @@ body { font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic Pro
   <div class="err" id="login-error"></div>
 </div>
 <script>
-// Same Supabase project as the match-stats dashboard (Rugby Total Data/handoff) --
-// this app's own tables (squad_players/injuries) live in that same project,
+// Toshiba Master Data's own Supabase project (separate from the
+// match-stats dashboard's project) -- squad_players/injuries live here,
 // gated by RLS policies that only allow rows through for emails listed in
 // coaching_staff_emails.
-const SUPABASE_URL = 'https://lwsrrourcwidrujvaqvr.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_WUHxP4DDM9FRN4JfduqDNA_-S3lCM2p';
+const SUPABASE_URL = 'https://rfezfalnfnoownxzibna.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_1Ri7VHRowpB0dotP1emnBw_jPcJCVN6';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function nextPath(){

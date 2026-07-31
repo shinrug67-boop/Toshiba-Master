@@ -1,18 +1,15 @@
--- Toshiba Master Data schema, additive to the existing Rugby Analytics
--- Supabase project (same project as handoff/supabase/schema.sql -- comps/
--- teams/players/fixtures/team_match_stats/player_match_stats). Run once in
--- the Supabase SQL Editor before running scripts/load_injuries.py.
+-- Toshiba Master Data schema, for Toshiba Master Data's own Supabase project
+-- (separate from the match-stats dashboard's Supabase project in
+-- Rugby Total Data/handoff -- see PROJECT_NOTES.md there for that one's
+-- comps/teams/players/fixtures/team_match_stats/player_match_stats). Run
+-- once in the Supabase SQL Editor before running scripts/load_injuries.py.
 --
--- squad_players is deliberately a *separate* identity table from the
--- existing `players` table: `players` holds every Opta-tracked player across
--- every team/competition in the match-stats data (opponents included) and is
--- fully truncated/reloaded by handoff/scripts/load_supabase.py. Toshiba
--- Master Data (rugby/gym/conditioning pages, all scoped to this squad only)
--- gets its own stable identity table instead of trying to join against the
--- match-stats `players` table. The rugby page's per-player stats are
--- embedded directly into rugby.html (see scripts/build_rugby_data.py) rather
--- than served from Supabase, so squad_players/injuries are the only tables
--- here for now -- gym data joins onto squad_players once its format exists.
+-- squad_players is this squad's own player identity table, used by both
+-- injuries (below) and, eventually, gym data once its format exists. The
+-- rugby page's per-player stats are embedded directly into rugby.html (see
+-- scripts/build_rugby_data.py, which reads the *other* project's
+-- compare_data.json at build time) rather than served from Supabase, so
+-- squad_players/injuries are the only tables needed here for now.
 
 -- ids are assigned by the loader script (enumerate over sorted names), not
 -- by a serial sequence -- same convention as comps/teams/players in
