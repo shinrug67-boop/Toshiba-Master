@@ -175,7 +175,9 @@ let LANG = localStorage.getItem('toshibaMasterDataLang') ||
   ((navigator.language || '').toLowerCase().startsWith('ja') ? 'ja' : 'en');
 function U(){ return UI[LANG]; }
 
-function seasonLabel(y){ return `${y}-${String(y+1).slice(2)}`; }
+// RAW.P's season integer is the season's *ending* year (e.g. 2024 means the
+// 2023-2024 season, which runs across the Dec-May calendar-year boundary).
+function seasonLabel(y){ return `${y - 1}-${y}`; }
 function pct(n,d){ return d ? (n/d*100) : 0; }
 function fmt(x, digits){ return digits===0 ? Math.round(x).toLocaleString() : x.toFixed(digits); }
 function v(id){ return document.getElementById(id).value; }
