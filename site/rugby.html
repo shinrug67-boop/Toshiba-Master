@@ -56,6 +56,11 @@ thead th:first-child { text-align:left; }
 tbody td { padding:6px 9px; border-bottom:1px solid var(--grid); text-align:right; font-variant-numeric:tabular-nums; }
 tbody td:first-child { text-align:left; }
 footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
+.chart-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--gap); }
+.chart-box { min-width:0; }
+.chart-box .chart-title { font-size:11px; color:var(--ink-2); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px; }
+#chart-tooltip { position:fixed; pointer-events:none; z-index:30; display:none; background:var(--surface); color:var(--ink-1);
+  border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.55); padding:7px 10px; font-size:12px; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -86,6 +91,7 @@ footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
   <div id="content"><div class="empty" id="loading-msg"></div></div>
   <footer id="page-foot"></footer>
 </div>
+<div id="chart-tooltip"></div>
 <script>
 const SUPABASE_URL = 'https://rfezfalnfnoownxzibna.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1Ri7VHRowpB0dotP1emnBw_jPcJCVN6';
@@ -110,6 +116,8 @@ const UI = {
     sec_time:'プレータイム(シーズン別、フィルタ非依存)', sec_attack:'アタック', sec_defense:'ディフェンス',
     sec_breakdown:'ブレイクダウン関与(Ruck OOA)', sec_kick:'キック', sec_other:'その他',
     sec_fw:'フォワード専門スタッツ', sec_scrum:'スクラム',
+    sec_compare:'シーズン比較', chart_playtime:'プレー時間(分/試合)', chart_carries:'キャリー(/試合)',
+    chart_tackle_pct:'タックル成功率(%)', chart_kickm:'キックメーター(m/試合)',
     pt_col_season:'シーズン', pt_col_min:'プレー時間(分)', pt_col_gp:'出場試合数', pt_col_avgmin:'平均プレー時間(分)',
     m_carries:'キャリー', m_carrym:'キャリーゲインm', m_post:'ポストコンタクトm', m_beaten:'DF Beaten',
     m_offload:'オフロード', m_offload_pct:'オフロード成功率', m_linebreak:'ラインブレイク', m_passes:'パス',
@@ -139,6 +147,8 @@ const UI = {
     sec_time:'Playing Time (by season, ignores filters above)', sec_attack:'Attack', sec_defense:'Defense',
     sec_breakdown:'Breakdown Involvement (Ruck OOA)', sec_kick:'Kicking', sec_other:'Other',
     sec_fw:'Forward-Specific Stats', sec_scrum:'Scrum',
+    sec_compare:'Season Comparison', chart_playtime:'Playing Time (min/match)', chart_carries:'Carries (/match)',
+    chart_tackle_pct:'Tackle Success (%)', chart_kickm:'Kick Metres (m/match)',
     pt_col_season:'Season', pt_col_min:'Minutes', pt_col_gp:'Games', pt_col_avgmin:'Avg min/match',
     m_carries:'Carries', m_carrym:'Carry metres', m_post:'Post-contact m', m_beaten:'DF Beaten',
     m_offload:'Offloads', m_offload_pct:'Offload success%', m_linebreak:'Line breaks', m_passes:'Passes',
@@ -253,6 +263,123 @@ function scrumBlock(container, c){
   }
 }
 
+// --- Season-comparison bar charts (plain inline SVG, no charting library,
+// matching the mark specs used elsewhere on this site: thin bar capped at
+// 24px, 4px-rounded top / square baseline, direct value label at the tip,
+// season on the x-axis, single hue since each chart is one series). ---
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function allRowsFor(playerIdx){
+  return RAW.P.filter(r => r[1] === playerIdx);
+}
+// One RAW.P row = one (season, player) pair already (single team/comp in
+// this embedded dataset), so no cross-row grouping is needed per season.
+function seasonSeries(playerIdx, key){
+  return allRowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0])
+    .map(r => ({ label: seasonLabel(r[0]), value: r[2] ? r[pIdx[key]] / r[2] : 0 }));
+}
+function seasonPctSeries(playerIdx, numKey, denKey){
+  return allRowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0])
+    .map(r => ({ label: seasonLabel(r[0]), value: r[pIdx[denKey]] ? r[pIdx[numKey]]/r[pIdx[denKey]]*100 : 0 }));
+}
+
+function showChartTooltip(evt, text){
+  const tip = document.getElementById('chart-tooltip');
+  tip.textContent = text;
+  tip.style.display = 'block';
+  tip.style.left = (evt.clientX + 14) + 'px';
+  tip.style.top = (evt.clientY + 14) + 'px';
+}
+function hideChartTooltip(){
+  document.getElementById('chart-tooltip').style.display = 'none';
+}
+
+function svgBarChart(container, points, digits){
+  container.replaceChildren();
+  if (!points.length) return;
+  const W = Math.max(container.clientWidth || 260, 200);
+  const H = 130, padT = 22, padB = 22, padX = 6;
+  const plotW = W - padX * 2, plotH = H - padT - padB;
+  const n = points.length;
+  const slotW = plotW / n;
+  const barW = Math.min(24, slotW - 10);
+  const maxV = Math.max(1, ...points.map(p => p.value));
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('width', '100%'); svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('role', 'img');
+
+  const base = document.createElementNS(SVG_NS, 'line');
+  base.setAttribute('x1', padX); base.setAttribute('x2', W - padX);
+  base.setAttribute('y1', padT + plotH); base.setAttribute('y2', padT + plotH);
+  base.setAttribute('stroke', 'var(--grid)'); base.setAttribute('stroke-width', 1);
+  svg.appendChild(base);
+
+  points.forEach((p, i) => {
+    const cx = padX + i * slotW + slotW / 2;
+    const barH = Math.max(maxV > 0 ? (p.value / maxV) * plotH : 0, 1);
+    const x = cx - barW / 2;
+    const yTop = padT + plotH - barH;
+    const r = Math.min(4, barH, barW / 2);
+
+    // Hover hit target spans the full slot (bigger than the visible bar,
+    // per the interaction spec) -- drawn first so the bar renders on top.
+    const hit = document.createElementNS(SVG_NS, 'rect');
+    hit.setAttribute('x', padX + i * slotW); hit.setAttribute('y', padT);
+    hit.setAttribute('width', slotW); hit.setAttribute('height', plotH);
+    hit.setAttribute('fill', 'transparent');
+    hit.addEventListener('mousemove', e => showChartTooltip(e, `${p.label}: ${fmt(p.value, digits)}`));
+    hit.addEventListener('mouseleave', hideChartTooltip);
+    svg.appendChild(hit);
+
+    const bar = document.createElementNS(SVG_NS, 'path');
+    bar.setAttribute('d',
+      `M${x},${yTop + barH} L${x},${yTop + r} Q${x},${yTop} ${x + r},${yTop} ` +
+      `L${x + barW - r},${yTop} Q${x + barW},${yTop} ${x + barW},${yTop + r} L${x + barW},${yTop + barH} Z`);
+    bar.setAttribute('fill', 'var(--gold)');
+    svg.appendChild(bar);
+
+    const lbl = document.createElementNS(SVG_NS, 'text');
+    lbl.setAttribute('x', cx); lbl.setAttribute('y', Math.max(yTop - 6, padT - 4));
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', 11);
+    lbl.setAttribute('font-weight', 700); lbl.setAttribute('fill', 'var(--ink-1)');
+    lbl.textContent = fmt(p.value, digits);
+    svg.appendChild(lbl);
+
+    const tick = document.createElementNS(SVG_NS, 'text');
+    tick.setAttribute('x', cx); tick.setAttribute('y', H - 6);
+    tick.setAttribute('text-anchor', 'middle'); tick.setAttribute('font-size', 10.5);
+    tick.setAttribute('fill', 'var(--ink-muted)');
+    tick.textContent = p.label;
+    svg.appendChild(tick);
+  });
+  container.appendChild(svg);
+}
+
+function seasonCompareSection(content, playerIdx){
+  // Nothing to compare with a single season of data.
+  if (new Set(allRowsFor(playerIdx).map(r => r[0])).size < 2) return;
+  const card = section(content, U().sec_compare);
+  const grid = document.createElement('div'); grid.className = 'chart-grid';
+  card.appendChild(grid); // attach before measuring clientWidth in svgBarChart
+
+  const specs = [
+    [U().chart_playtime, seasonSeries(playerIdx, 'playtime'), 0],
+    [U().chart_carries, seasonSeries(playerIdx, 'carries'), 1],
+    [U().chart_tackle_pct, seasonPctSeries(playerIdx, 'tk_succ', 'tackles'), 1],
+    [U().chart_kickm, seasonSeries(playerIdx, 'kick_mtr'), 0],
+  ];
+  specs.forEach(([title, points, digits]) => {
+    const box = document.createElement('div'); box.className = 'chart-box';
+    const h = document.createElement('div'); h.className = 'chart-title'; h.textContent = title;
+    box.appendChild(h);
+    const chartDiv = document.createElement('div');
+    box.appendChild(chartDiv);
+    grid.appendChild(box);
+    svgBarChart(chartDiv, points, digits);
+  });
+}
+
 function fillFilters(){
   const seasons = [...new Set(RAW.P.map(r=>r[0]))].sort((a,b)=>b-a);
   const sSel = document.getElementById('f-season');
@@ -283,6 +410,8 @@ function render(){
   const head = document.createElement('div'); head.className = 'player-head';
   head.innerHTML = `<div class="name">${RAW.players[playerIdx]}</div><div class="pos">${pos || ''}</div>`;
   content.appendChild(head);
+
+  seasonCompareSection(content, playerIdx);
 
   const ptCard = section(content, U().sec_time);
   ptCard.appendChild(playtimeTable(playerIdx));
