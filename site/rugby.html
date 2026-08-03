@@ -284,6 +284,13 @@ function seasonTotalSeries(playerIdx, key){
   return allRowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0])
     .map(r => ({ label: seasonLabel(r[0]), value: r[pIdx[key]] }));
 }
+// A rate has no meaningful "season total" the way a count does, so this
+// doesn't fit the bar=total/line=avg pair -- it gets its own single line
+// chart (rate-over-time is a trend job) instead of a pair.
+function seasonPctSeries(playerIdx, numKey, denKey){
+  return allRowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0])
+    .map(r => ({ label: seasonLabel(r[0]), value: r[pIdx[denKey]] ? r[pIdx[numKey]]/r[pIdx[denKey]]*100 : 0 }));
+}
 
 function showChartTooltip(evt, text){
   const tip = document.getElementById('chart-tooltip');
@@ -468,6 +475,20 @@ function seasonCompareSection(content, playerIdx){
     const lineDiv = document.createElement('div'); lineBox.appendChild(lineDiv);
     pair.appendChild(lineBox);
     svgLineChart(lineDiv, seasonAvgSeries(playerIdx, key), avgDigits);
+
+    // Tackle success% rides right after the Tackles pair (same defensive
+    // stat), as a single line chart -- see seasonPctSeries above for why it
+    // doesn't get a bar/total half.
+    if (key === 'tackles'){
+      const pctGroup = document.createElement('div'); pctGroup.className = 'metric-compare';
+      const pctH = document.createElement('div'); pctH.className = 'chart-title'; pctH.textContent = U().m_tackle_pct;
+      pctGroup.appendChild(pctH);
+      const pctBox = document.createElement('div'); pctBox.className = 'chart-box';
+      const pctDiv = document.createElement('div'); pctBox.appendChild(pctDiv);
+      pctGroup.appendChild(pctBox);
+      card.appendChild(pctGroup);
+      svgLineChart(pctDiv, seasonPctSeries(playerIdx, 'tk_succ', 'tackles'), 1);
+    }
   });
 }
 
