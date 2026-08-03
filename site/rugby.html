@@ -56,9 +56,11 @@ thead th:first-child { text-align:left; }
 tbody td { padding:6px 9px; border-bottom:1px solid var(--grid); text-align:right; font-variant-numeric:tabular-nums; }
 tbody td:first-child { text-align:left; }
 footer { margin-top:16px; font-size:12px; color:var(--ink-muted); }
-.chart-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--gap); }
+.metric-compare + .metric-compare { margin-top:16px; padding-top:16px; border-top:1px solid var(--grid); }
+.metric-compare .chart-title { font-size:12px; color:var(--ink-1); font-weight:700; margin-bottom:8px; }
+.chart-pair { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
 .chart-box { min-width:0; }
-.chart-box .chart-title { font-size:11px; color:var(--ink-2); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px; }
+.chart-box .chart-sublabel { font-size:10.5px; color:var(--ink-muted); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
 #chart-tooltip { position:fixed; pointer-events:none; z-index:30; display:none; background:var(--surface); color:var(--ink-1);
   border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.55); padding:7px 10px; font-size:12px; white-space:nowrap; }
 </style>
@@ -116,8 +118,7 @@ const UI = {
     sec_time:'プレータイム(シーズン別、フィルタ非依存)', sec_attack:'アタック', sec_defense:'ディフェンス',
     sec_breakdown:'ブレイクダウン関与(Ruck OOA)', sec_kick:'キック', sec_other:'その他',
     sec_fw:'フォワード専門スタッツ', sec_scrum:'スクラム',
-    sec_compare:'シーズン比較', chart_playtime:'プレー時間(分/試合)', chart_carries:'キャリー(/試合)',
-    chart_tackle_pct:'タックル成功率(%)', chart_kickm:'キックメーター(m/試合)',
+    sec_compare:'シーズン比較', m_playtime:'プレー時間', lbl_total:'合計', lbl_avg_match:'平均(試合)',
     pt_col_season:'シーズン', pt_col_min:'プレー時間(分)', pt_col_gp:'出場試合数', pt_col_avgmin:'平均プレー時間(分)',
     m_carries:'キャリー', m_carrym:'キャリーゲインm', m_post:'ポストコンタクトm', m_beaten:'DF Beaten',
     m_offload:'オフロード', m_offload_pct:'オフロード成功率', m_linebreak:'ラインブレイク', m_passes:'パス',
@@ -147,8 +148,7 @@ const UI = {
     sec_time:'Playing Time (by season, ignores filters above)', sec_attack:'Attack', sec_defense:'Defense',
     sec_breakdown:'Breakdown Involvement (Ruck OOA)', sec_kick:'Kicking', sec_other:'Other',
     sec_fw:'Forward-Specific Stats', sec_scrum:'Scrum',
-    sec_compare:'Season Comparison', chart_playtime:'Playing Time (min/match)', chart_carries:'Carries (/match)',
-    chart_tackle_pct:'Tackle Success (%)', chart_kickm:'Kick Metres (m/match)',
+    sec_compare:'Season Comparison', m_playtime:'Playing Time', lbl_total:'Total', lbl_avg_match:'Avg / match',
     pt_col_season:'Season', pt_col_min:'Minutes', pt_col_gp:'Games', pt_col_avgmin:'Avg min/match',
     m_carries:'Carries', m_carrym:'Carry metres', m_post:'Post-contact m', m_beaten:'DF Beaten',
     m_offload:'Offloads', m_offload_pct:'Offload success%', m_linebreak:'Line breaks', m_passes:'Passes',
@@ -276,13 +276,13 @@ function allRowsFor(playerIdx){
 }
 // One RAW.P row = one (season, player) pair already (single team/comp in
 // this embedded dataset), so no cross-row grouping is needed per season.
-function seasonSeries(playerIdx, key){
+function seasonAvgSeries(playerIdx, key){
   return allRowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0])
     .map(r => ({ label: seasonLabel(r[0]), value: r[2] ? r[pIdx[key]] / r[2] : 0 }));
 }
-function seasonPctSeries(playerIdx, numKey, denKey){
+function seasonTotalSeries(playerIdx, key){
   return allRowsFor(playerIdx).slice().sort((a,b)=>a[0]-b[0])
-    .map(r => ({ label: seasonLabel(r[0]), value: r[pIdx[denKey]] ? r[pIdx[numKey]]/r[pIdx[denKey]]*100 : 0 }));
+    .map(r => ({ label: seasonLabel(r[0]), value: r[pIdx[key]] }));
 }
 
 function showChartTooltip(evt, text){
@@ -358,27 +358,116 @@ function svgBarChart(container, points, digits){
   container.appendChild(svg);
 }
 
+// Line variant of the same chart: 2px round-joined line, an 8px marker dot
+// (with a 2px surface ring so it stays legible) at every point, and a direct
+// value label at each point -- labeling every point (not just the endpoint)
+// matches the bar chart it sits beside, and with only 2-3 seasons it never
+// floods the chart the way it would with a real time series.
+function svgLineChart(container, points, digits){
+  container.replaceChildren();
+  if (!points.length) return;
+  const W = Math.max(container.clientWidth || 260, 200);
+  // padX is wider than the bar chart's: the first/last point sit exactly at
+  // the plot edge (no slot to center within), so there must be enough room
+  // on both sides for a full center-anchored season label like "2025-2026"
+  // (~54px at this font size) without its edge clipping off the SVG.
+  const H = 130, padT = 22, padB = 22, padX = 32;
+  const plotW = W - padX * 2, plotH = H - padT - padB;
+  const n = points.length;
+  const maxV = Math.max(1, ...points.map(p => p.value));
+  const xAt = i => n > 1 ? padX + (i / (n - 1)) * plotW : padX + plotW / 2;
+  const yAt = v => padT + plotH - (maxV > 0 ? (v / maxV) * plotH : 0);
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('width', '100%'); svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('role', 'img');
+
+  const base = document.createElementNS(SVG_NS, 'line');
+  base.setAttribute('x1', padX); base.setAttribute('x2', W - padX);
+  base.setAttribute('y1', padT + plotH); base.setAttribute('y2', padT + plotH);
+  base.setAttribute('stroke', 'var(--grid)'); base.setAttribute('stroke-width', 1);
+  svg.appendChild(base);
+
+  const linePts = points.map((p, i) => `${xAt(i)},${yAt(p.value)}`).join(' ');
+  const line = document.createElementNS(SVG_NS, 'polyline');
+  line.setAttribute('points', linePts);
+  line.setAttribute('fill', 'none'); line.setAttribute('stroke', 'var(--gold)');
+  line.setAttribute('stroke-width', 2); line.setAttribute('stroke-linejoin', 'round');
+  line.setAttribute('stroke-linecap', 'round');
+  svg.appendChild(line);
+
+  points.forEach((p, i) => {
+    const cx = xAt(i), cy = yAt(p.value);
+
+    const hit = document.createElementNS(SVG_NS, 'circle');
+    hit.setAttribute('cx', cx); hit.setAttribute('cy', padT + plotH / 2);
+    hit.setAttribute('r', Math.max(plotW / n / 2, 16));
+    hit.setAttribute('fill', 'transparent');
+    hit.addEventListener('mousemove', e => showChartTooltip(e, `${p.label}: ${fmt(p.value, digits)}`));
+    hit.addEventListener('mouseleave', hideChartTooltip);
+    svg.appendChild(hit);
+
+    const ring = document.createElementNS(SVG_NS, 'circle');
+    ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', 6);
+    ring.setAttribute('fill', 'var(--surface)');
+    svg.appendChild(ring);
+    const dot = document.createElementNS(SVG_NS, 'circle');
+    dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 4);
+    dot.setAttribute('fill', 'var(--gold)');
+    svg.appendChild(dot);
+
+    const lbl = document.createElementNS(SVG_NS, 'text');
+    lbl.setAttribute('x', cx); lbl.setAttribute('y', Math.max(cy - 10, padT - 4));
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', 11);
+    lbl.setAttribute('font-weight', 700); lbl.setAttribute('fill', 'var(--ink-1)');
+    lbl.textContent = fmt(p.value, digits);
+    svg.appendChild(lbl);
+
+    const tick = document.createElementNS(SVG_NS, 'text');
+    tick.setAttribute('x', cx); tick.setAttribute('y', H - 6);
+    tick.setAttribute('text-anchor', 'middle'); tick.setAttribute('font-size', 10.5);
+    tick.setAttribute('fill', 'var(--ink-muted)');
+    tick.textContent = p.label;
+    svg.appendChild(tick);
+  });
+  container.appendChild(svg);
+}
+
 function seasonCompareSection(content, playerIdx){
   // Nothing to compare with a single season of data.
   if (new Set(allRowsFor(playerIdx).map(r => r[0])).size < 2) return;
   const card = section(content, U().sec_compare);
-  const grid = document.createElement('div'); grid.className = 'chart-grid';
-  card.appendChild(grid); // attach before measuring clientWidth in svgBarChart
 
-  const specs = [
-    [U().chart_playtime, seasonSeries(playerIdx, 'playtime'), 0],
-    [U().chart_carries, seasonSeries(playerIdx, 'carries'), 1],
-    [U().chart_tackle_pct, seasonPctSeries(playerIdx, 'tk_succ', 'tackles'), 1],
-    [U().chart_kickm, seasonSeries(playerIdx, 'kick_mtr'), 0],
+  const metrics = [
+    [U().m_playtime, 'playtime', 0, 1],
+    [U().m_carries, 'carries', 0, 1],
+    [U().m_carrym, 'carry_distplus', 0, 1],
+    [U().m_post, 'carry_post', 0, 1],
+    [U().m_tackles, 'tackles', 0, 1],
+    [U().m_kicks, 'kicks', 0, 1],
+    [U().m_kickmtr, 'kick_mtr', 0, 1],
   ];
-  specs.forEach(([title, points, digits]) => {
-    const box = document.createElement('div'); box.className = 'chart-box';
+  metrics.forEach(([title, key, totalDigits, avgDigits]) => {
+    const group = document.createElement('div'); group.className = 'metric-compare';
     const h = document.createElement('div'); h.className = 'chart-title'; h.textContent = title;
-    box.appendChild(h);
-    const chartDiv = document.createElement('div');
-    box.appendChild(chartDiv);
-    grid.appendChild(box);
-    svgBarChart(chartDiv, points, digits);
+    group.appendChild(h);
+    const pair = document.createElement('div'); pair.className = 'chart-pair';
+    group.appendChild(pair);
+    card.appendChild(group); // attach before measuring clientWidth in the chart builders
+
+    const barBox = document.createElement('div'); barBox.className = 'chart-box';
+    const barLbl = document.createElement('div'); barLbl.className = 'chart-sublabel'; barLbl.textContent = U().lbl_total;
+    barBox.appendChild(barLbl);
+    const barDiv = document.createElement('div'); barBox.appendChild(barDiv);
+    pair.appendChild(barBox);
+    svgBarChart(barDiv, seasonTotalSeries(playerIdx, key), totalDigits);
+
+    const lineBox = document.createElement('div'); lineBox.className = 'chart-box';
+    const lineLbl = document.createElement('div'); lineLbl.className = 'chart-sublabel'; lineLbl.textContent = U().lbl_avg_match;
+    lineBox.appendChild(lineLbl);
+    const lineDiv = document.createElement('div'); lineBox.appendChild(lineDiv);
+    pair.appendChild(lineBox);
+    svgLineChart(lineDiv, seasonAvgSeries(playerIdx, key), avgDigits);
   });
 }
 
