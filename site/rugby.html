@@ -477,17 +477,31 @@ function seasonCompareSection(content, playerIdx){
     svgLineChart(lineDiv, seasonAvgSeries(playerIdx, key), avgDigits);
 
     // Tackle success% rides right after the Tackles pair (same defensive
-    // stat), as a single line chart -- see seasonPctSeries above for why it
-    // doesn't get a bar/total half.
+    // stat). A rate has no distinct "total" the way a count does, so both
+    // halves plot the same per-season rate (successes/attempts for that
+    // whole season) -- kept as a bar+line pair anyway for the same scan
+    // pattern as every other metric row, per the user's request.
     if (key === 'tackles'){
       const pctGroup = document.createElement('div'); pctGroup.className = 'metric-compare';
       const pctH = document.createElement('div'); pctH.className = 'chart-title'; pctH.textContent = U().m_tackle_pct;
       pctGroup.appendChild(pctH);
-      const pctBox = document.createElement('div'); pctBox.className = 'chart-box';
-      const pctDiv = document.createElement('div'); pctBox.appendChild(pctDiv);
-      pctGroup.appendChild(pctBox);
+      const pctPair = document.createElement('div'); pctPair.className = 'chart-pair';
+      pctGroup.appendChild(pctPair);
       card.appendChild(pctGroup);
-      svgLineChart(pctDiv, seasonPctSeries(playerIdx, 'tk_succ', 'tackles'), 1);
+
+      const pctBarBox = document.createElement('div'); pctBarBox.className = 'chart-box';
+      const pctBarLbl = document.createElement('div'); pctBarLbl.className = 'chart-sublabel'; pctBarLbl.textContent = U().lbl_total;
+      pctBarBox.appendChild(pctBarLbl);
+      const pctBarDiv = document.createElement('div'); pctBarBox.appendChild(pctBarDiv);
+      pctPair.appendChild(pctBarBox);
+      svgBarChart(pctBarDiv, seasonPctSeries(playerIdx, 'tk_succ', 'tackles'), 1);
+
+      const pctLineBox = document.createElement('div'); pctLineBox.className = 'chart-box';
+      const pctLineLbl = document.createElement('div'); pctLineLbl.className = 'chart-sublabel'; pctLineLbl.textContent = U().lbl_avg_match;
+      pctLineBox.appendChild(pctLineLbl);
+      const pctLineDiv = document.createElement('div'); pctLineBox.appendChild(pctLineDiv);
+      pctPair.appendChild(pctLineBox);
+      svgLineChart(pctLineDiv, seasonPctSeries(playerIdx, 'tk_succ', 'tackles'), 1);
     }
   });
 }
